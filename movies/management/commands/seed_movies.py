@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from movies.models import Category, Genre, Movie, DownloadLink, EpisodeThumbnail
 
-DATASET = Path("/home/z/my-project/scripts/movies_dataset.json")
+DATASET = Path(settings.BASE_DIR) / "scripts" / "movies_dataset.json"
 POSTERS_DIR = Path(settings.MEDIA_ROOT) / "posters"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

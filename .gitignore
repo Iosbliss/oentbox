@@ -33,6 +33,9 @@ ENV/
 .vscode/
 .idea/
 
+# Deploy artifacts
+*-deploy.tar.gz
+
 # OS
 .DS_Store
 Thumbs.db
