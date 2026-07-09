@@ -19,10 +19,12 @@ RUN mkdir -p /app/media/posters /app/staticfiles \
 
 RUN python manage.py collectstatic --noinput --clear
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER nobody
 
 EXPOSE 8000
 
-COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-", "--error-logfile", "-"]
