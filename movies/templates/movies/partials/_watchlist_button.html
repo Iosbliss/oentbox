@@ -1,0 +1,10 @@
+<button class="btn {% if in_watchlist %}btn--primary{% else %}btn--ghost{% endif %} btn--watchlist"
+        hx-post="{% url 'toggle_watchlist' movie.id %}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        aria-label="{% if in_watchlist %}Remove from list{% else %}Add to list{% endif %}">
+  <svg viewBox="0 0 24 24" fill="{% if in_watchlist %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+  </svg>
+  {% if in_watchlist %}In My List{% else %}Add to List{% endif %}
+</button>

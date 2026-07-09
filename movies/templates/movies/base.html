@@ -1,0 +1,131 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: light)">
+  <meta name="description" content="{{ SITE_TAGLINE }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MovieHub">
+  <link rel="manifest" href="{% url 'manifest' %}">
+  <link rel="apple-touch-icon" href="/static/pwa/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/static/pwa/favicon.svg">
+  <link rel="icon" type="image/png" sizes="96x96" href="/static/pwa/favicon-96x96.png">
+  <link rel="icon" type="image/x-icon" href="/static/pwa/favicon.ico">
+  <link rel="shortcut icon" href="/static/pwa/favicon.ico">
+  <link rel="stylesheet" href="{% static 'movies/css/app.css' %}">
+  <title>{% block title %}{{ page_title|default:"Home" }} — {{ SITE_NAME }}{% endblock %}</title>
+  {% csrf_token %}
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="app-shell" data-page="{{ page_title|default:'home' }}">
+
+<!-- iOS safe-area top spacer -->
+<div class="safe-area-top"></div>
+
+<!-- Top app bar -->
+<header class="topbar" id="topbar">
+  <a href="{% url 'home' %}" class="topbar__brand" aria-label="OentBox home">
+    <span class="brand-mark">O</span>
+    <span class="brand-text">Oent<span class="brand-accent">Box</span></span>
+  </a>
+
+  <nav class="topbar__nav">
+    <a href="{% url 'home' %}">Home</a>
+    <a href="{% url 'browse' %}">Browse</a>
+    <a href="{% url 'watchlist' %}">My List</a>
+    {% if user.is_staff %}
+    <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+    <a href="{% url 'logout' %}">Logout</a>
+    {% endif %}
+  </nav>
+
+  <form class="topbar__search" action="{% url 'search' %}" method="get" autocomplete="off">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="search" name="q" placeholder="Search movies, series, anime…"
+           value="{% if current_q %}{{ current_q }}{% endif %}"
+           aria-label="Search"
+           hx-get="{% url 'suggestions' %}"
+           hx-trigger="input changed delay:250ms, search"
+           hx-target="#suggestions-dropdown"
+           hx-swap="innerHTML">
+    <button type="submit" class="sr-only">Search</button>
+  </form>
+
+  <div class="suggestions-dropdown" id="suggestions-dropdown" hidden></div>
+</header>
+
+<!-- Main scrollable content -->
+<main class="main" id="main">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Bottom navigation (mobile-first, native app style) -->
+<nav class="bottomnav" aria-label="Primary">
+  <a href="{% url 'home' %}" class="bottomnav__item" data-route="home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="{% url 'browse' %}" class="bottomnav__item" data-route="browse">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Browse</span>
+  </a>
+  <a href="{% url 'search' %}" class="bottomnav__item" data-route="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <span>Search</span>
+  </a>
+  <a href="{% url 'watchlist' %}" class="bottomnav__item" data-route="watchlist">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+    <span>My List</span>
+  </a>
+</nav>
+
+<!-- iOS safe-area bottom spacer -->
+<div class="safe-area-bottom"></div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__brand">
+      <span class="footer__logo"><span class="brand-mark brand-mark--sm">O</span><span>Oent<span class="brand-accent">Box</span></span></span>
+      <p class="footer__tagline">Stream &amp; Download the latest Nollywood, Hollywood, K-Drama, Anime and more in HD.</p>
+    </div>
+    <div class="footer__links">
+      <div class="footer__col">
+        <h4 class="footer__heading">Explore</h4>
+        <a href="{% url 'home' %}">Home</a>
+        <a href="{% url 'browse' %}">Browse Movies</a>
+        <a href="{% url 'search' %}">Search</a>
+        <a href="{% url 'watchlist' %}">My List</a>
+      </div>
+      <div class="footer__col">
+        <h4 class="footer__heading">Categories</h4>
+        {% for c in global_categories|slice:":6" %}
+        <a href="{% url 'category' c.slug %}">{{ c.icon }} {{ c.name }}</a>
+        {% endfor %}
+      </div>
+      <div class="footer__col">
+        <h4 class="footer__heading">About</h4>
+        <p class="footer__text">Stream and download the latest movies, series, and anime in HD quality.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <p class="footer__copyright">&copy; {% now "Y" %} OentBox. All rights reserved.</p>
+  </div>
+</footer>
+
+<!-- Floating scroll-to-top button -->
+<button class="scrolltop" id="scrolltop" aria-label="Scroll to top" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
+</button>
+
+<script src="{% static 'movies/js/htmx.min.js' %}"></script>
+<script src="{% static 'movies/js/app.js' %}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

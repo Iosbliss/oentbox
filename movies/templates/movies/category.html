@@ -1,0 +1,32 @@
+{% extends "movies/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ category.icon|default:"🎬" }} {{ category.name }}</h1>
+  {% if category.description %}<p class="page-subtitle">{{ category.description }}</p>{% endif %}
+</div>
+
+<div class="movie-grid" id="movie-grid">
+  {% for m in movies %}
+    {% include "movies/partials/_movie_card.html" %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+  <div class="infinite-next"
+       hx-get="?page={{ page_obj.next_page_number }}"
+       hx-trigger="revealed"
+       hx-swap="outerHTML"
+       hx-target="this">
+  </div>
+  {% endif %}
+
+  {% if not movies %}
+  <div class="empty-state">
+    <div class="empty-state__icon">📂</div>
+    <h3>No movies in this category yet</h3>
+    <a href="{% url 'browse' %}" class="btn btn--primary">Browse all</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

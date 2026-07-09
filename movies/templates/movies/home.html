@@ -1,0 +1,96 @@
+{% extends "movies/base.html" %}
+{% load static %}
+
+{% block content %}
+<!-- HERO CAROUSEL -->
+{% if hero %}
+<section class="hero" id="hero">
+  <div class="hero__slides" id="hero-slides">
+    {% for m in hero_pool %}
+    <article class="hero__slide {% if forloop.first %}is-active{% endif %}" data-slide="{{ forloop.counter0 }}"
+             style="background-image: url('{{ m.backdrop_url|default:m.poster_url }}');"
+             onerror="this.style.backgroundImage='linear-gradient(135deg, #1a1a24, #2a1a25)';">
+      <div class="hero__overlay"></div>
+      <div class="hero__content">
+        <div class="hero__badges">
+          {% if m.is_trending %}<span class="badge badge--trending">🔥 Trending</span>{% endif %}
+          {% if m.is_new_release %}<span class="badge badge--new">🆕 New</span>{% endif %}
+          <span class="badge badge--type">{{ m.type_label }}</span>
+          {% if m.year %}<span class="badge">{{ m.year }}</span>{% endif %}
+          <span class="badge badge--rating">⭐ {{ m.rating|default:"8.0" }}</span>
+        </div>
+        <h1 class="hero__title">{{ m.title }}</h1>
+        <p class="hero__plot">{{ m.short_plot }}</p>
+        <div class="hero__meta">
+          {% if m.country %}<span>🌍 {{ m.country }}</span>{% endif %}
+          {% if m.language %}<span>🗣 {{ m.language }}</span>{% endif %}
+          {% if m.quality %}<span>📹 {{ m.quality }}</span>{% endif %}
+          {% if m.status %}<span>📊 {{ m.status }}</span>{% endif %}
+        </div>
+        <div class="hero__actions">
+          <a href="{% url 'movie_detail' m.slug %}" class="btn btn--primary">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            View Details
+          </a>
+          <button class="btn btn--ghost"
+                  hx-post="{% url 'toggle_watchlist' m.id %}"
+                  hx-target="this"
+                  hx-swap="outerHTML">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Add to List
+          </button>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  {% if hero_pool|length > 1 %}
+  <div class="hero__dots" id="hero-dots">
+    {% for m in hero_pool %}
+    <button class="hero__dot {% if forloop.first %}is-active{% endif %}" data-dot="{{ forloop.counter0 }}" aria-label="Slide {{ forloop.counter }}"></button>
+    {% endfor %}
+  </div>
+  <button class="hero__nav hero__nav--prev" id="hero-prev" aria-label="Previous">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+  </button>
+  <button class="hero__nav hero__nav--next" id="hero-next" aria-label="Next">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+  </button>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- CONTENT ROWS -->
+<div class="rows">
+  {% for row in rows %}
+  <section class="row" id="row-{{ row.slug }}" data-row-slug="{{ row.slug }}">
+    <div class="row__header">
+      <h2 class="row__title">{{ row.title }}</h2>
+      {% if row.movies|length >= 6 %}
+      <a href="{% url 'browse' %}?{% if row.slug == 'nollywood' or row.slug == 'hollywood' %}cat={{ row.slug }}{% elif row.slug == 'new' %}sort=new{% elif row.slug == 'trending' %}sort=views{% else %}cat={{ row.slug }}{% endif %}"
+         class="row__more">See all →</a>
+      {% endif %}
+    </div>
+    <div class="row__scroller" data-row-scroller>
+      <div class="row__track">
+        {% include "movies/partials/_row_cards.html" with movies=row.movies row_slug=row.slug %}
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<!-- CATEGORY PILLS -->
+<section class="cat-strip">
+  <h2 class="section-title">Browse by Category</h2>
+  <div class="cat-strip__scroller">
+    {% for c in global_categories %}
+    <a href="{% url 'category' c.slug %}" class="cat-pill">
+      <span class="cat-pill__icon">{{ c.icon|default:"🎬" }}</span>
+      <span class="cat-pill__name">{{ c.name }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "movies/base.html" %}
+{% load static humanize %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">My List</h1>
+  <p class="page-subtitle">Your saved movies & series, ready to watch.</p>
+</div>
+
+<div class="movie-grid">
+  {% if movies %}
+    {% for m in movies %}
+      {% include "movies/partials/_movie_card.html" %}
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon">🔖</div>
+      <h3>Your list is empty</h3>
+      <p>Tap the bookmark icon on any movie to add it here.</p>
+      <a href="{% url 'browse' %}" class="btn btn--primary">Browse movies</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

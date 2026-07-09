@@ -1,0 +1,305 @@
+{% extends "movies/base.html" %}
+{% load static humanize %}
+
+{% block seo_title %}Admin Dashboard — {{ SEO_SITE_NAME }}{% endblock %}
+{% block seo_description %}OentBox admin dashboard showing comprehensive site statistics, movie counts, views, and analytics.{% endblock %}
+
+{% block content %}
+<div class="dash">
+  <div class="page-header">
+    <h1 class="page-title">📊 Admin Dashboard</h1>
+    <p class="page-subtitle">Comprehensive site statistics and analytics</p>
+  </div>
+
+  <!-- Stat cards row -->
+  <div class="dash__cards">
+    <div class="dash__card dash__card--primary">
+      <div class="dash__card-icon">🎬</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_movies|intcomma }}</div>
+        <div class="dash__card-label">Total Movies</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--blue">
+      <div class="dash__card-icon">📂</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_categories }}</div>
+        <div class="dash__card-label">Categories</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--green">
+      <div class="dash__card-icon">⬇</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_download_links|intcomma }}</div>
+        <div class="dash__card-label">Download Links</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--gold">
+      <div class="dash__card-icon">👁</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_views|intcomma }}</div>
+        <div class="dash__card-label">Total Views</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--purple">
+      <div class="dash__card-icon">▶</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ movies_with_trailer|intcomma }}</div>
+        <div class="dash__card-label">Movies with Trailers</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--red">
+      <div class="dash__card-icon">🏷</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_genres }}</div>
+        <div class="dash__card-label">Genres</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--teal">
+      <div class="dash__card-icon">🖼</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_thumbnails|intcomma }}</div>
+        <div class="dash__card-label">Episode Thumbnails</div>
+      </div>
+    </div>
+    <div class="dash__card dash__card--orange">
+      <div class="dash__card-icon">🔖</div>
+      <div class="dash__card-body">
+        <div class="dash__card-value">{{ total_watchlist_items|intcomma }}</div>
+        <div class="dash__card-label">Watchlist Items</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quality stats -->
+  <section class="dash__section">
+    <h2 class="dash__heading">📋 Data Quality</h2>
+    <div class="dash__quality">
+      <div class="dash__quality-item">
+        <div class="dash__quality-label">
+          <span>Poster coverage</span>
+          <span class="dash__quality-pct">{{ poster_pct }}%</span>
+        </div>
+        <div class="dash__progress"><div class="dash__progress-bar" style="width:{{ poster_pct }}%"></div></div>
+        <div class="dash__quality-count">{{ movies_with_poster|intcomma }} / {{ total_movies|intcomma }}</div>
+      </div>
+      <div class="dash__quality-item">
+        <div class="dash__quality-label">
+          <span>Trailer coverage</span>
+          <span class="dash__quality-pct">{{ trailer_pct }}%</span>
+        </div>
+        <div class="dash__progress"><div class="dash__progress-bar dash__progress--blue" style="width:{{ trailer_pct }}%"></div></div>
+        <div class="dash__quality-count">{{ movies_with_trailer|intcomma }} / {{ total_movies|intcomma }}</div>
+      </div>
+      <div class="dash__quality-item">
+        <div class="dash__quality-label">
+          <span>Plot/synopsis coverage</span>
+          <span class="dash__quality-pct">{{ plot_pct }}%</span>
+        </div>
+        <div class="dash__progress"><div class="dash__progress-bar dash__progress--green" style="width:{{ plot_pct }}%"></div></div>
+        <div class="dash__quality-count">{{ movies_with_plot|intcomma }} / {{ total_movies|intcomma }}</div>
+      </div>
+      <div class="dash__quality-item">
+        <div class="dash__quality-label">
+          <span>Download links coverage</span>
+          <span class="dash__quality-pct">{{ downloads_pct }}%</span>
+        </div>
+        <div class="dash__progress"><div class="dash__progress-bar dash__progress--gold" style="width:{{ downloads_pct }}%"></div></div>
+        <div class="dash__quality-count">{{ movies_with_downloads|intcomma }} / {{ total_movies|intcomma }}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Category breakdown -->
+  <section class="dash__section">
+    <h2 class="dash__heading">📂 Movies per Category</h2>
+    <div class="dash__table-wrap">
+      <table class="dash__table">
+        <thead>
+          <tr><th>Category</th><th>Movies</th><th>Total Views</th><th>Download Links</th><th>Bar</th></tr>
+        </thead>
+        <tbody>
+          {% for c in category_stats %}
+          <tr>
+            <td>{{ c.icon }} {{ c.name }}</td>
+            <td class="dash__num">{{ c.movie_count }}</td>
+            <td class="dash__num">{{ c.total_views|intcomma }}</td>
+            <td class="dash__num">{{ c.download_links|intcomma }}</td>
+            <td>
+              <div class="dash__bar-wrap">
+                <div class="dash__bar" style="width:{% widthratio c.movie_count total_movies 100 %}%"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Two columns: Top movies + Top genres -->
+  <div class="dash__two-col">
+    <section class="dash__section">
+      <h2 class="dash__heading">🔥 Top 10 Movies by Views</h2>
+      <div class="dash__table-wrap">
+        <table class="dash__table">
+          <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Views</th><th>Rating</th></tr></thead>
+          <tbody>
+            {% for m in top_movies_views %}
+            <tr>
+              <td class="dash__rank">{{ forloop.counter }}</td>
+              <td class="dash__title">{{ m.title|truncatechars:40 }}</td>
+              <td>{{ m.category__name|default:"—" }}</td>
+              <td class="dash__num">{{ m.views|intcomma }}</td>
+              <td>⭐ {{ m.rating|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="dash__section">
+      <h2 class="dash__heading">⭐ Top 10 Movies by Rating</h2>
+      <div class="dash__table-wrap">
+        <table class="dash__table">
+          <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Rating</th><th>Views</th></tr></thead>
+          <tbody>
+            {% for m in top_movies_rating %}
+            <tr>
+              <td class="dash__rank">{{ forloop.counter }}</td>
+              <td class="dash__title">{{ m.title|truncatechars:40 }}</td>
+              <td>{{ m.category__name|default:"—" }}</td>
+              <td>⭐ {{ m.rating }}</td>
+              <td class="dash__num">{{ m.views|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Two columns: Genres + Countries -->
+  <div class="dash__two-col">
+    <section class="dash__section">
+      <h2 class="dash__heading">🏷 Top Genres</h2>
+      <div class="dash__chips">
+        {% for g in top_genres %}
+        <div class="dash__chip">
+          <span class="dash__chip-name">{{ g.name }}</span>
+          <span class="dash__chip-count">{{ g.movie_count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash__section">
+      <h2 class="dash__heading">🌍 Top Countries</h2>
+      <div class="dash__table-wrap">
+        <table class="dash__table">
+          <thead><tr><th>Country</th><th>Movies</th><th>Distribution</th></tr></thead>
+          <tbody>
+            {% for country, count in top_countries %}
+            <tr>
+              <td>{{ country }}</td>
+              <td class="dash__num">{{ count }}</td>
+              <td>
+                <div class="dash__bar-wrap">
+                  <div class="dash__bar dash__bar--blue" style="width:{% widthratio count total_movies 100 %}%"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Two columns: Status + Type -->
+  <div class="dash__two-col">
+    <section class="dash__section">
+      <h2 class="dash__heading">📊 Status Distribution</h2>
+      <div class="dash__stats-grid">
+        {% for status, count in status_counts.items %}
+        <div class="dash__stat-box">
+          <div class="dash__stat-value">{{ count }}</div>
+          <div class="dash__stat-label">{{ status }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash__section">
+      <h2 class="dash__heading">🎬 Type Distribution</h2>
+      <div class="dash__stats-grid">
+        {% for type, count in type_counts.items %}
+        <div class="dash__stat-box">
+          <div class="dash__stat-value">{{ count }}</div>
+          <div class="dash__stat-label">{{ type }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <!-- Download quality distribution -->
+  <section class="dash__section">
+    <h2 class="dash__heading">📐 Download Quality Distribution</h2>
+    <div class="dash__quality-grid">
+      {% for quality, count in quality_data %}
+      <div class="dash__quality-chip">
+        <span class="dash__quality-chip-label">{{ quality }}</span>
+        <span class="dash__quality-chip-count">{{ count|intcomma }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Recent movies -->
+  <section class="dash__section">
+    <h2 class="dash__heading">🆕 Recently Added (Last 7 Days)</h2>
+    <div class="dash__table-wrap">
+      <table class="dash__table">
+        <thead><tr><th>Title</th><th>Category</th><th>Added</th><th>Views</th></tr></thead>
+        <tbody>
+          {% for m in recent_movies %}
+          <tr>
+            <td class="dash__title">{{ m.title|truncatechars:50 }}</td>
+            <td>{{ m.category__name|default:"—" }}</td>
+            <td>{{ m.created_at|date:"M j, Y H:i" }}</td>
+            <td class="dash__num">{{ m.views|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="dash__empty">No movies added in the last 7 days</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Quick actions -->
+  <section class="dash__section">
+    <h2 class="dash__heading">⚡ Quick Actions</h2>
+    <div class="dash__actions">
+      <a href="{% url 'browse' %}" class="dash__action">
+        <span class="dash__action-icon">📂</span>
+        <span>Browse All Movies</span>
+      </a>
+      <a href="{% url 'search' %}" class="dash__action">
+        <span class="dash__action-icon">🔍</span>
+        <span>Search Movies</span>
+      </a>
+      <a href="{% url 'home' %}" class="dash__action">
+        <span class="dash__action-icon">🏠</span>
+        <span>Go Home</span>
+      </a>
+      <a href="{% url 'watchlist' %}" class="dash__action">
+        <span class="dash__action-icon">🔖</span>
+        <span>My List</span>
+      </a>
+    </div>
+  </section>
+</div>
+{% endblock %}

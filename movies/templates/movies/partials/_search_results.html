@@ -1,0 +1,26 @@
+{% if movies %}
+<div class="search-results">
+  {% for m in movies %}
+  <a href="{% url 'movie_detail' m.slug %}" class="search-item">
+    <img src="{{ m.poster_url }}" alt="" class="search-item__poster" loading="lazy"
+         onerror="this.style.visibility='hidden'">
+    <div class="search-item__info">
+      <div class="search-item__title">{{ m.title }}</div>
+      <div class="search-item__meta">
+        <span>{{ m.type_label }}</span>
+        {% if m.year %}<span class="dot">•</span><span>{{ m.year }}</span>{% endif %}
+        {% if m.category %}<span class="dot">•</span><span>{{ m.category.name }}</span>{% endif %}
+      </div>
+    </div>
+    <span class="search-item__rating">⭐ {{ m.rating|default:"8.0" }}</span>
+  </a>
+  {% endfor %}
+  <a href="/search/?q={{ q|urlencode }}" class="search-item search-item--all">
+    See all results for "{{ q }}" →
+  </a>
+</div>
+{% else %}
+<div class="search-results">
+  <div class="search-empty">No movies found for "{{ q }}"</div>
+</div>
+{% endif %}

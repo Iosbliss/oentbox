@@ -1,0 +1,18 @@
+{% if movies %}
+{% for m in movies %}
+<a href="{% url 'movie_detail' m.slug %}" class="suggest-item">
+  <img src="{{ m.poster_url }}" alt="" class="suggest-item__poster" loading="lazy"
+       onerror="this.style.visibility='hidden'">
+  <div class="suggest-item__body">
+    <div class="suggest-item__title">{{ m.title }}</div>
+    <div class="suggest-item__meta">
+      <span>{{ m.type_label }}</span>
+      {% if m.year %}<span class="dot">•</span><span>{{ m.year }}</span>{% endif %}
+      {% if m.category %}<span class="dot">•</span><span>{{ m.category.name }}</span>{% endif %}
+    </div>
+  </div>
+</a>
+{% endfor %}
+{% else %}
+<div class="suggest-empty">No suggestions</div>
+{% endif %}

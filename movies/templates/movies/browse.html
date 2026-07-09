@@ -1,0 +1,73 @@
+{% extends "movies/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Browse</h1>
+  <p class="page-subtitle">All movies & series — filter, sort, and discover.</p>
+</div>
+
+<!-- Filter bar -->
+<div class="filterbar" id="filterbar">
+  <form method="get" action="{% url 'browse' %}" id="filter-form"
+        hx-get="{% url 'browse' %}"
+        hx-target="#movie-grid"
+        hx-trigger="change"
+        hx-push-url="true"
+        hx-indicator="#grid-loader">
+    <div class="filterbar__row">
+      <div class="filterbar__search">
+        <input type="search" name="q" placeholder="Filter by title…" value="{{ current_q }}" aria-label="Search">
+      </div>
+      <select name="cat" aria-label="Category">
+        <option value="">All categories</option>
+        {% for c in categories %}
+        <option value="{{ c.slug }}" {% if current_cat == c.slug %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="genre" aria-label="Genre">
+        <option value="">All genres</option>
+        {% for g in genres %}
+        <option value="{{ g.slug }}" {% if current_genre == g.slug %}selected{% endif %}>{{ g.name }} ({{ g.movie_count }})</option>
+        {% endfor %}
+      </select>
+      <select name="sort" aria-label="Sort by">
+        <option value="new" {% if current_sort == 'new' %}selected{% endif %}>Newest</option>
+        <option value="rating" {% if current_sort == 'rating' %}selected{% endif %}>Top rated</option>
+        <option value="views" {% if current_sort == 'views' %}selected{% endif %}>Most viewed</option>
+        <option value="title" {% if current_sort == 'title' %}selected{% endif %}>A–Z</option>
+      </select>
+      <button type="submit" class="btn btn--ghost btn--sm">Apply</button>
+    </div>
+  </form>
+</div>
+
+<!-- Movie grid -->
+<div class="movie-grid" id="movie-grid">
+  {% for m in movies %}
+    {% include "movies/partials/_movie_card.html" %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+  <div class="infinite-next"
+       hx-get="?{% if current_cat %}cat={{ current_cat }}{% endif %}{% if current_genre %}&genre={{ current_genre }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}&page={{ page_obj.next_page_number }}"
+       hx-trigger="revealed"
+       hx-swap="outerHTML"
+       hx-target="this">
+  </div>
+  {% endif %}
+
+  {% if not movies %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🎬</div>
+    <h3>No movies found</h3>
+    <p>Try adjusting your filters or search terms.</p>
+    <a href="{% url 'browse' %}" class="btn btn--primary">Reset filters</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid-loader" id="grid-loader">
+  <div class="spinner"></div>
+</div>
+{% endblock %}

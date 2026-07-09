@@ -1,0 +1,47 @@
+{% extends "movies/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Search</h1>
+  <p class="page-subtitle">Find movies, series, anime, and more.</p>
+</div>
+
+<div class="search-page">
+  <form class="search-page__form"
+        action="{% url 'search' %}"
+        method="get"
+        hx-get="{% url 'search' %}"
+        hx-target="#search-results"
+        hx-trigger="submit"
+        hx-push-url="true"
+        hx-indicator="#search-loader">
+    <input type="search" name="q" placeholder="Type a title, country, or genre…"
+           value="{{ q }}" autofocus
+           aria-label="Search query">
+    <button type="submit" class="btn btn--primary">Search</button>
+  </form>
+
+  <div class="search-loader" id="search-loader"><div class="spinner"></div></div>
+
+  <div id="search-results" class="movie-grid">
+    {% if movies %}
+      {% for m in movies %}
+        {% include "movies/partials/_movie_card.html" %}
+      {% endfor %}
+    {% elif q %}
+      <div class="empty-state">
+        <div class="empty-state__icon">🔍</div>
+        <h3>No results for "{{ q }}"</h3>
+        <p>Try a different keyword.</p>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state__icon">🔎</div>
+        <h3>Start typing to search</h3>
+        <p>Search across {{ SITE_NAME }}'s entire catalog.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

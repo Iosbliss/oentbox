@@ -1,0 +1,44 @@
+{% extends "movies/base.html" %}
+{% load static %}
+
+{% block seo_title %}Admin Login — {{ SEO_SITE_NAME }}{% endblock %}
+{% block seo_description %}OentBox admin login page.{% endblock %}
+
+{% block content %}
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-card__header">
+      <span class="brand-mark">O</span>
+      <h1 class="login-card__title">Admin Login</h1>
+      <p class="login-card__sub">Sign in to access the dashboard</p>
+    </div>
+
+    {% if error %}
+    <div class="login-card__error">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" class="login-form">
+      {% csrf_token %}
+      <div class="login-form__field">
+        <label for="username">Username</label>
+        <input type="text" name="username" id="username" placeholder="Enter your username" required autofocus>
+      </div>
+      <div class="login-form__field">
+        <label for="password">Password</label>
+        <input type="password" name="password" id="password" placeholder="Enter your password" required>
+      </div>
+      <button type="submit" class="btn btn--primary login-form__btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign In
+      </button>
+    </form>
+
+    <div class="login-card__footer">
+      <a href="{% url 'home' %}">← Back to site</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

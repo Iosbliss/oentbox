@@ -1,0 +1,38 @@
+{% load humanize %}
+<article class="card card--grid" data-movie-id="{{ m.id }}">
+  <a href="{% url 'movie_detail' m.slug %}" class="card__link" aria-label="{{ m.title }}">
+    <div class="card__poster">
+      <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy"
+           onerror="this.onerror=null;this.parentNode.classList.add('poster-fallback');this.remove();">
+      <div class="card__overlay">
+        <div class="card__badges">
+          {% if m.is_new_release %}<span class="badge badge--new">NEW</span>{% endif %}
+          {% if m.is_trending %}<span class="badge badge--trending">🔥</span>{% endif %}
+        </div>
+        <div class="card__play">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <div class="card__meta">
+          <span class="card__rating">⭐ {{ m.rating|default:"8.0" }}</span>
+          <span class="card__year">{{ m.year|default:"" }}</span>
+          <span class="card__quality">{{ m.quality|default:"HD" }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card__info">
+      <h3 class="card__title" title="{{ m.title }}">{{ m.title }}</h3>
+      <div class="card__sub">
+        <span>{{ m.type_label }}</span>
+        {% if m.category %}<span class="dot">•</span><span>{{ m.category.name }}</span>{% endif %}
+      </div>
+      <div class="card__views">👁 {{ m.views|intcomma }} views</div>
+    </div>
+  </a>
+  <button class="card__save"
+          hx-post="{% url 'toggle_watchlist' m.id %}"
+          hx-target="this"
+          hx-swap="outerHTML"
+          aria-label="Save to list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+  </button>
+</article>

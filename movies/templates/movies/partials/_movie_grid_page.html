@@ -1,0 +1,14 @@
+{% load humanize %}
+<!-- This is a single page of movies for infinite scroll. Append to grid container. -->
+{% for m in movies %}
+{% include "movies/partials/_movie_card.html" %}
+{% endfor %}
+
+{% if page_obj.has_next %}
+<div class="infinite-next"
+     hx-get="?{% if current_cat %}cat={{ current_cat }}{% endif %}{% if current_genre %}&genre={{ current_genre }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}&page={{ page_obj.next_page_number }}"
+     hx-trigger="revealed"
+     hx-swap="outerHTML"
+     hx-target="this">
+</div>
+{% endif %}

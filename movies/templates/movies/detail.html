@@ -1,0 +1,164 @@
+{% extends "movies/base.html" %}
+{% load static humanize %}
+
+{% block content %}
+<article class="detail">
+  <!-- Hero / backdrop -->
+  <div class="detail__hero" style="background-image: url('{{ movie.backdrop_url|default:movie.poster_url }}');">
+    <div class="detail__hero-overlay"></div>
+    <button class="detail__back" onclick="history.length > 1 ? history.back() : window.location.href='/'" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+  </div>
+
+  <!-- Main info card (overlaps hero) -->
+  <div class="detail__body">
+    <div class="detail__head">
+      <div class="detail__poster">
+        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}"
+             onerror="this.onerror=null;this.parentNode.classList.add('poster-fallback');this.remove();">
+      </div>
+      <div class="detail__head-info">
+        <div class="detail__badges">
+          <span class="badge badge--type">{{ movie.type_label }}</span>
+          {% if movie.year %}<span class="badge">{{ movie.year }}</span>{% endif %}
+          <span class="badge badge--rating">⭐ {{ movie.rating|default:"8.0" }}</span>
+          <span class="badge">{{ movie.quality|default:"HD" }}</span>
+          <span class="badge">{{ movie.status }}</span>
+        </div>
+        <h1 class="detail__title">{{ movie.title }}</h1>
+        <div class="detail__meta-row">
+          {% if movie.country %}<span>🌍 {{ movie.country }}</span>{% endif %}
+          {% if movie.language %}<span>🗣 {{ movie.language }}</span>{% endif %}
+          {% if movie.duration %}<span>⏱ {{ movie.duration }}</span>{% endif %}
+          <span>👁 {{ movie.views|intcomma }} views</span>
+        </div>
+
+        {% if movie.genres.all %}
+        <div class="detail__genres">
+          {% for g in movie.genres.all %}
+          <a href="{% url 'browse' %}?genre={{ g.slug }}" class="genre-chip">{{ g.name }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="detail__actions">
+          {% include "movies/partials/_watchlist_button.html" %}
+          {% if movie.imdb_url %}
+          <a href="{{ movie.imdb_url }}" target="_blank" rel="noopener" class="btn btn--ghost">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm5.6 11.7c-.3 1.2-1.5 1.9-2.7 1.6-1.4-.3-2.8-.4-4.2-.3-1.4.1-2.7.4-3.9 1-.9.4-2 .1-2.5-.8-.5-.9-.2-2 .7-2.5 1.5-.8 3.1-1.2 4.8-1.4 1.9-.2 3.7 0 5.5.5 1.2.3 1.9 1.5 1.6 2.7l.7.2z"/></svg>
+            TMDB
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Plot -->
+    <section class="detail__section">
+      <h2 class="detail__h2">Synopsis</h2>
+      <p class="detail__plot">{{ movie.plot }}</p>
+    </section>
+
+    <!-- Trailer -->
+    {% if movie.youtube_id %}
+    <section class="detail__section">
+      <h2 class="detail__h2">▶ Watch Trailer</h2>
+      <div class="trailer" id="trailer-wrapper">
+        <button class="trailer__poster" id="trailer-poster"
+                style="background-image: url('https://img.youtube.com/vi/{{ movie.youtube_id }}/maxresdefault.jpg'), url('https://img.youtube.com/vi/{{ movie.youtube_id }}/hqdefault.jpg');"
+                aria-label="Play trailer">
+          <span class="trailer__play">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </span>
+          <span class="trailer__label">Play Trailer</span>
+        </button>
+        <iframe
+          id="trailer-iframe"
+          data-src="https://www.youtube.com/embed/{{ movie.youtube_id }}?rel=0&modestbranding=1&autoplay=1"
+          title="{{ movie.title }} — Trailer"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+          loading="lazy"
+          style="display:none;"></iframe>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Download links -->
+    <section class="detail__section">
+      <h2 class="detail__h2">⬇ Download Options</h2>
+      {% if movie.download_links.all %}
+      <div class="downloads">
+        {% for dl in movie.download_links.all %}
+        <a href="{{ dl.url }}" target="_blank" rel="noopener nofollow" class="download-card">
+          <div class="download-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div class="download-card__body">
+            <div class="download-card__label">{{ dl.label }}</div>
+            <div class="download-card__meta">
+              {% if dl.quality %}<span class="chip chip--quality">{{ dl.quality }}</span>{% endif %}
+              {% if dl.size %}<span class="chip chip--muted">{{ dl.size }}</span>{% endif %}
+              {% if 'loadedfiles.org' in dl.url %}<span class="chip chip--host">loadedfiles</span>{% endif %}
+            </div>
+          </div>
+          <svg class="download-card__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        {% endfor %}
+      </div>
+      <p class="downloads__note">
+        💡 Downloads open on external file host (loadedfiles.org). Tap a link, then click "Download" on the next page.
+      </p>
+      {% else %}
+      <p class="empty-section">No download links available for this title.</p>
+      {% endif %}
+    </section>
+
+    <!-- Episode thumbnails (if any) -->
+    {% if movie.thumbnails.all %}
+    <section class="detail__section">
+      <h2 class="detail__h2">Episode Preview</h2>
+      <div class="thumbs-scroller">
+        {% for th in movie.thumbnails.all %}
+        <div class="thumb-card">
+          <img src="{{ th.image_url }}" alt="{{ th.caption|default:forloop.counter }}" loading="lazy"
+               onerror="this.style.display='none'">
+          {% if th.caption %}<span class="thumb-card__caption">{{ th.caption }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Recommended -->
+    {% if recommended %}
+    <section class="detail__section">
+      <h2 class="detail__h2">You Might Also Like</h2>
+      <div class="row__scroller">
+        <div class="row__track">
+          {% include "movies/partials/_row_cards.html" with movies=recommended row_slug="recommended" %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Related (same category) -->
+    {% if related %}
+    <section class="detail__section">
+      <h2 class="detail__h2">More from {{ movie.category.name|default:"this category" }}</h2>
+      <div class="row__scroller">
+        <div class="row__track">
+          {% include "movies/partials/_row_cards.html" with movies=related row_slug="related" %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <div class="detail__source">
+      <a href="{{ movie.source_url }}" target="_blank" rel="noopener">View original source ↗</a>
+    </div>
+  </div>
+</article>
+{% endblock %}
