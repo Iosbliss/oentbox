@@ -56,7 +56,48 @@
     <button type="submit" class="sr-only">Search</button>
   </form>
 
+  <!-- Hamburger menu button (mobile only) -->
+  <button class="topbar__hamburger" id="hamburger-btn" aria-label="Open menu" aria-expanded="false">
+    <svg class="hamburger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <line x1="4" y1="6" x2="20" y2="6"/>
+      <line x1="4" y1="12" x2="20" y2="12"/>
+      <line x1="4" y1="18" x2="20" y2="18"/>
+    </svg>
+  </button>
+
   <div class="suggestions-dropdown" id="suggestions-dropdown" hidden></div>
+
+  <!-- Hamburger menu drawer (slides down from topbar, mobile only) -->
+  <div class="hamburger-drawer" id="hamburger-drawer" hidden>
+    <nav class="hamburger-drawer__nav">
+      <a href="{% url 'home' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+        <span>Home</span>
+      </a>
+      <a href="{% url 'browse' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Browse</span>
+      </a>
+      <a href="{% url 'search' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search</span>
+      </a>
+      <a href="{% url 'watchlist' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <span>My List</span>
+      </a>
+      {% if user.is_staff %}
+      <a href="{% url 'dashboard' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="18" height="9" rx="2"/><path d="M3 12V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M9 21h1"/><path d="M14 21h1"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="{% url 'logout' %}" class="hamburger-drawer__item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Logout</span>
+      </a>
+      {% endif %}
+    </nav>
+  </div>
 </header>
 
 <!-- Main scrollable content -->

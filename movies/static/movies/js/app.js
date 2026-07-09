@@ -265,6 +265,56 @@
     });
   }
 
+  // -------- Hamburger menu toggle (mobile) --------
+  function initHamburger() {
+    var btn = document.getElementById("hamburger-btn");
+    var drawer = document.getElementById("hamburger-drawer");
+    if (!btn || !drawer) return;
+
+    var isOpen = false;
+
+    function openMenu() {
+      isOpen = true;
+      btn.classList.add("is-open");
+      btn.setAttribute("aria-expanded", "true");
+      drawer.hidden = false;
+      drawer.classList.add("is-open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeMenu() {
+      isOpen = false;
+      btn.classList.remove("is-open");
+      btn.setAttribute("aria-expanded", "false");
+      drawer.classList.remove("is-open");
+      document.body.style.overflow = "";
+      // Hide after transition completes
+      setTimeout(function () {
+        if (!isOpen) drawer.hidden = true;
+      }, 350);
+    }
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (isOpen) closeMenu(); else openMenu();
+    });
+
+    // Close on outside click
+    document.addEventListener("click", function (e) {
+      if (isOpen && !btn.contains(e.target) && !drawer.contains(e.target)) {
+        closeMenu();
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && isOpen) {
+        closeMenu();
+        btn.focus();
+      }
+    });
+  }
+
   // -------- Init on DOM ready --------
   function init() {
     initHero();
@@ -274,6 +324,7 @@
     initRowScroll();
     initSearchDropdown();
     initTrailer();
+    initHamburger();
     registerSW();
   }
 
