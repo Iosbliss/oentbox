@@ -2,8 +2,11 @@
 *.sqlite3
 *.sqlite3-journal
 
-# Media / uploads
-/media/
+# Media / uploads (keep folder structure, ignore user-uploaded files)
+/media/*
+!/media/.gitkeep
+/media/posters/*
+!/media/posters/.gitkeep
 
 # Python
 __pycache__/
