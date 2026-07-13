@@ -30,9 +30,15 @@ urlpatterns = [
     path("movies/watchlist/<int:movie_id>/", views.toggle_watchlist, name="toggle_watchlist"),
     path("movies/suggestions/", views.suggestions, name="suggestions"),
 
+    path("sitemap.xml", views.sitemap, name="sitemap"),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
+
     # Favicon
     path("favicon.ico", RedirectView.as_view(url="/static/pwa/favicon.ico", permanent=True)),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+handler404 = "movies.views.not_found"
+handler500 = "movies.views.server_error"

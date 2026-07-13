@@ -6,9 +6,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-oentbox-dev-key-change-in-production-9jarocks-2026")
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("1", "true", "yes")
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
+ALLOWED_HOSTS = os.environ["DJANGO_ALLOWED_HOSTS"].split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -73,7 +73,11 @@ else:
         }
     }
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -97,6 +101,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
 
 # Security headers for production
 if not DEBUG:
+    SECURE_SSL_REDIRECT = True
     CSRF_TRUSTED_ORIGINS = os.environ.get(
         "CSRF_TRUSTED_ORIGINS",
         f"https://{os.environ.get('DOMAIN', 'localhost')}"

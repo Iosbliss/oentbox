@@ -5,17 +5,20 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev curl \
-    && rm -rf /var/lib/apt/lists/*
+# Build-time args (required for collectstatic)
+ARG DJANGO_SECRET_KEY=dummy-build-only-key
+ENV DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
+ARG DJANGO_ALLOWED_HOSTS=*
+ENV DJANGO_ALLOWED_HOSTS=$DJANGO_ALLOWED_HOSTS
+
+RUN apt-get update     && apt-get install -y --no-install-recommends libpq-dev curl     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/media/posters /app/staticfiles \
-    && chown -R nobody:nogroup /app/media /app/staticfiles
+RUN mkdir -p /app/media/posters /app/staticfiles     && chown -R nobody:nogroup /app/media /app/staticfiles
 
 RUN python manage.py collectstatic --noinput --clear
 

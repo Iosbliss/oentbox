@@ -39,3 +39,6 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+*.bak
+*.pyc
+media/image_cache/

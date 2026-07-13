@@ -70,6 +70,16 @@ class Movie(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_trending"], name="movies_movi_is_tren_2aaa84_idx"),
+            models.Index(fields=["is_new_release"], name="movies_movi_is_new__4458de_idx"),
+            models.Index(fields=["is_featured"], name="movies_movi_is_feat_b67c49_idx"),
+            models.Index(fields=["category"], name="movies_movi_categor_3d8279_idx"),
+            models.Index(fields=["created_at"], name="movies_movi_created_36c764_idx"),
+            models.Index(fields=["views"], name="movies_movi_views_8e3043_idx"),
+            models.Index(fields=["rating"], name="movies_movi_rating_872ab8_idx"),
+            models.Index(fields=["year"], name="movies_movi_year_e90d32_idx"),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.year or '—'})"

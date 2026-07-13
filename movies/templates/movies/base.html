@@ -9,20 +9,31 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="MovieHub">
+  <meta property="og:site_name" content="{{ SITE_NAME }}">
+  <meta property="og:title" content="{% block og_title %}{{ page_title|default:'Home' }} — {{ SITE_NAME }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ SITE_TAGLINE }}{% endblock %}">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  {% block og_image %}<meta property="og:image" content="/static/pwa/og-default.png">{% endblock %}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% block twitter_title %}{{ page_title|default:'Home' }} — {{ SITE_NAME }}{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}{{ SITE_TAGLINE }}{% endblock %}">
+  {% block twitter_image %}<meta name="twitter:image" content="/static/pwa/og-default.png">{% endblock %}
+
+  <meta name="apple-mobile-web-app-title" content="OentBox">
   <link rel="manifest" href="{% url 'manifest' %}">
   <link rel="apple-touch-icon" href="/static/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/svg+xml" href="/static/pwa/favicon.svg">
   <link rel="icon" type="image/png" sizes="96x96" href="/static/pwa/favicon-96x96.png">
   <link rel="icon" type="image/x-icon" href="/static/pwa/favicon.ico">
   <link rel="shortcut icon" href="/static/pwa/favicon.ico">
-  <link rel="stylesheet" href="{% static 'movies/css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'movies/css/app.css' %}?v=14">
   <title>{% block title %}{{ page_title|default:"Home" }} — {{ SITE_NAME }}{% endblock %}</title>
-  {% csrf_token %}
-  <meta name="csrf-token" content="{{ csrf_token }}">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="app-shell" data-page="{{ page_title|default:'home' }}">
+  {% csrf_token %}
+  <meta name="csrf-token" content="{{ csrf_token }}">
 
 <!-- iOS safe-area top spacer -->
 <div class="safe-area-top"></div>
@@ -46,7 +57,7 @@
 
   <form class="topbar__search" action="{% url 'search' %}" method="get" autocomplete="off">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-    <input type="search" name="q" placeholder="Search movies, series, anime…"
+    <input type="search" name="q" placeholder="Search movies, series, anime..."
            value="{% if current_q %}{{ current_q }}{% endif %}"
            aria-label="Search"
            hx-get="{% url 'suggestions' %}"
@@ -161,12 +172,12 @@
 </footer>
 
 <!-- Floating scroll-to-top button -->
-<button class="scrolltop" id="scrolltop" aria-label="Scroll to top" hidden>
+<button class="scrolltop" id="scrolltop" aria-label="Scroll to top">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 </button>
 
 <script src="{% static 'movies/js/htmx.min.js' %}"></script>
-<script src="{% static 'movies/js/app.js' %}"></script>
+<script src="{% static 'movies/js/app.js' %}?v=5"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,5 +1,30 @@
 {% extends "movies/base.html" %}
 {% load static humanize %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Movie",
+  "name": "{{ movie.title|escapejs }}",
+  "description": "{{ movie.short_plot|escapejs }}",
+  "image": "{{ movie.poster_url }}",
+  "dateCreated": "{{ movie.year|default:'' }}",
+  {% if movie.rating %}
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "{{ movie.rating }}",
+    "bestRating": "10",
+    "worstRating": "0"
+  },
+  {% endif %}
+  "duration": "{{ movie.duration }}",
+  "genre": [{% for g in movie.genres.all %}"{{ g.name }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "countryOfOrigin": "{{ movie.country }}",
+  "url": "{{ request.build_absolute_uri }}"
+}
+</script>
+{% endblock %}
+
 
 {% block content %}
 <article class="detail">

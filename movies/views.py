@@ -40,25 +40,25 @@ def home(request):
         {
             "title": "🔥 Trending Now",
             "slug": "trending",
-            "movies": list(Movie.objects.filter(is_trending=True).order_by("-views")[:14]),
+            "movies": list(Movie.objects.filter(is_trending=True).select_related('category').order_by("-views")[:14]),
             "endpoint": "/movies/row/trending/",
         },
         {
             "title": "🆕 New Releases",
             "slug": "new",
-            "movies": list(Movie.objects.filter(is_new_release=True).order_by("-created_at")[:14]),
+            "movies": list(Movie.objects.filter(is_new_release=True).select_related('category').order_by("-created_at")[:14]),
             "endpoint": "/movies/row/new/",
         },
         {
             "title": "🎬 Nollywood Picks",
             "slug": "nollywood",
-            "movies": list(Movie.objects.filter(category__slug__in=["nollywood", "nollywood-series"]).order_by("-created_at")[:14]),
+            "movies": list(Movie.objects.filter(category__slug__in=["nollywood", "nollywood-series"]).select_related("category").order_by("-created_at")[:14]),
             "endpoint": "/movies/row/nollywood/",
         },
         {
             "title": "🍿 Hollywood Blockbusters",
             "slug": "hollywood",
-            "movies": list(Movie.objects.filter(category__slug__in=["hollywood", "hollywood-series"]).order_by("-created_at")[:14]),
+            "movies": list(Movie.objects.filter(category__slug__in=["hollywood", "hollywood-series"]).select_related("category").order_by("-created_at")[:14]),
             "endpoint": "/movies/row/hollywood/",
         },
         {
@@ -182,7 +182,7 @@ def browse(request):
 
 
 def movie_detail(request, slug):
-    movie = get_object_or_404(Movie, slug=slug)
+    movie = get_object_or_404(Movie.objects.select_related('category'), slug=slug)
     # Increment views
     Movie.objects.filter(pk=movie.pk).update(views=movie.views + 1)
     movie.refresh_from_db()
@@ -191,6 +191,7 @@ def movie_detail(request, slug):
     related = (
         Movie.objects.filter(category=movie.category)
         .exclude(pk=movie.pk)
+        .select_related('category')
         .order_by("-created_at")[:8]
     )
     # If not enough, fill from same genre or any
@@ -218,7 +219,7 @@ def movie_detail(request, slug):
 def category_view(request, slug):
     """Category landing page."""
     cat = get_object_or_404(Category, slug=slug, is_active=True)
-    movies = Movie.objects.filter(category=cat).order_by("-created_at")
+    movies = Movie.objects.filter(category=cat).select_related('category').order_by("-created_at")
     page = int(request.GET.get("page", 1))
     paginator = Paginator(movies, 24)
     page_obj = paginator.get_page(page)
@@ -241,7 +242,7 @@ def search(request):
     if q:
         movies = Movie.objects.filter(
             Q(title__icontains=q) | Q(plot__icontains=q) | Q(country__icontains=q) | Q(genres__name__icontains=q)
-        ).distinct().order_by("-views")[:30]
+        ).distinct().select_related('category').order_by("-views")[:30]
 
     context = {"movies": movies, "q": q, "page_title": f"Search: {q}"}
     if is_htmx(request):
@@ -263,19 +264,19 @@ def watchlist(request):
 # --------------------------------------------------------------------
 
 ROW_BUILDERS = {
-    "trending": lambda: Movie.objects.filter(is_trending=True).order_by("-views"),
-    "new": lambda: Movie.objects.filter(is_new_release=True).order_by("-created_at"),
-    "nollywood": lambda: Movie.objects.filter(category__slug__in=["nollywood", "nollywood-series"]).order_by("-created_at"),
-    "hollywood": lambda: Movie.objects.filter(category__slug__in=["hollywood", "hollywood-series"]).order_by("-created_at"),
-    "korean-drama": lambda: Movie.objects.filter(category__slug="korean-drama").order_by("-created_at"),
-    "chinese-drama": lambda: Movie.objects.filter(category__slug="chinese-drama").order_by("-created_at"),
-    "thai-drama": lambda: Movie.objects.filter(category__slug="thai-drama").order_by("-created_at"),
-    "filipino-drama": lambda: Movie.objects.filter(category__slug="filipino-drama").order_by("-created_at"),
-    "japanese-drama": lambda: Movie.objects.filter(category__slug="japanese-drama").order_by("-created_at"),
-    "anime": lambda: Movie.objects.filter(category__slug="anime").order_by("-created_at"),
-    "foreign": lambda: Movie.objects.filter(category__slug="foreign").order_by("-created_at"),
-    "other-foreign-series": lambda: Movie.objects.filter(category__slug="other-foreign-series").order_by("-created_at"),
-    "wrestling": lambda: Movie.objects.filter(category__slug="wrestling").order_by("-created_at"),
+    "trending": lambda: Movie.objects.filter(is_trending=True).select_related("category").order_by("-views"),
+    "new": lambda: Movie.objects.filter(is_new_release=True).select_related("category").order_by("-created_at"),
+    "nollywood": lambda: Movie.objects.filter(category__slug__in=["nollywood", "nollywood-series"]).select_related("category").order_by("-created_at"),
+    "hollywood": lambda: Movie.objects.filter(category__slug__in=["hollywood", "hollywood-series"]).select_related("category").order_by("-created_at"),
+    "korean-drama": lambda: Movie.objects.filter(category__slug="korean-drama").select_related("category").order_by("-created_at"),
+    "chinese-drama": lambda: Movie.objects.filter(category__slug="chinese-drama").select_related("category").order_by("-created_at"),
+    "thai-drama": lambda: Movie.objects.filter(category__slug="thai-drama").select_related("category").order_by("-created_at"),
+    "filipino-drama": lambda: Movie.objects.filter(category__slug="filipino-drama").select_related("category").order_by("-created_at"),
+    "japanese-drama": lambda: Movie.objects.filter(category__slug="japanese-drama").select_related("category").order_by("-created_at"),
+    "anime": lambda: Movie.objects.filter(category__slug="anime").select_related("category").order_by("-created_at"),
+    "foreign": lambda: Movie.objects.filter(category__slug="foreign").select_related("category").order_by("-created_at"),
+    "other-foreign-series": lambda: Movie.objects.filter(category__slug="other-foreign-series").select_related("category").order_by("-created_at"),
+    "wrestling": lambda: Movie.objects.filter(category__slug="wrestling").select_related("category").order_by("-created_at"),
 }
 
 
@@ -313,7 +314,7 @@ def suggestions(request):
     q = request.GET.get("q", "").strip()
     if len(q) < 2:
         return HttpResponse("")
-    movies = Movie.objects.filter(title__icontains=q).order_by("-views")[:6]
+    movies = Movie.objects.filter(title__icontains=q).select_related('category').order_by("-views")[:6]
     context = {"movies": movies, "q": q}
     return render(request, "movies/partials/_suggestions.html", context)
 
@@ -519,44 +520,98 @@ def manifest(request):
 
 
 def service_worker(request):
-    """Service worker JS — served from root path /sw.js"""
-    sw_js = """
-const CACHE = 'oentbox-v4';
-const ASSETS = [
-  '/',
-  '/static/movies/css/app.css',
-  '/static/movies/js/app.js',
-  '/offline/',
-];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {}));
-  self.skipWaiting();
+    sw_js = '''
+var CACHE = "oentbox-v2";
+var STATIC = "/static/";
+
+self.addEventListener("install", function(e) {
+  e.waitUntil(
+    caches.open(CACHE).then(function(c) {
+      return c.addAll(["/", "/offline/", "/static/movies/css/app.css?v=6", "/static/movies/js/app.js?v=4", "/static/movies/js/htmx.min.js"]);
+    }).then(function() { return self.skipWaiting(); })
+  );
 });
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
+
+self.addEventListener("activate", function(e) {
+  e.waitUntil(
+    caches.keys().then(function(ks) {
+      return Promise.all(ks.map(function(k) { if (k !== CACHE) return caches.delete(k); }));
+    }).then(function() { return self.clients.claim(); })
+  );
 });
-self.addEventListener('fetch', e => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  // Network-first for HTML, cache-first for assets
-  if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
-    e.respondWith(
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then(r => r || caches.match('/offline/')))
-    );
-  } else {
-    e.respondWith(
-      caches.match(req).then(cached => cached || fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      }).catch(() => cached))
-    );
+
+self.addEventListener("fetch", function(e) {
+  var u = new URL(e.request.url);
+  if (u.pathname.startsWith(STATIC)) {
+    e.respondWith(caches.match(e.request).then(function(r) { return r || fetch(e.request).then(function(r2) { var c = r2.clone(); caches.open(CACHE).then(function(ca) { ca.put(e.request, c); }); return r2; }); }));
+    return;
   }
+  if (e.request.mode === "navigate") {
+    e.respondWith(fetch(e.request).then(function(r) { var c = r.clone(); caches.open(CACHE).then(function(ca) { ca.put(e.request, c); }); return r; }).catch(function() { return caches.match(e.request).then(function(r) { return r || caches.match("/offline/"); }); }));
+    return;
+  }
+  e.respondWith(fetch(e.request));
 });
-""".strip()
+'''.strip()
     return HttpResponse(sw_js, content_type="application/javascript")
+
+
+def not_found(request, exception=None):
+    return render(request, "movies/404.html", {"page_title": "404"}, status=404)
+
+def server_error(request):
+    return render(request, "movies/500.html", {"page_title": "500"}, status=500)
+
+def sitemap(request):
+    """XML sitemap for better SEO indexing."""
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+
+    pages = [
+        (reverse('home'), '1.0', 'daily'),
+        (reverse('browse'), '0.9', 'weekly'),
+        (reverse('watchlist'), '0.5', 'weekly'),
+        (reverse('search'), '0.5', 'weekly'),
+    ]
+
+    categories = Category.objects.filter(is_active=True)
+    for cat in categories:
+        pages.append((reverse('category', args=[cat.slug]), '0.7', 'weekly'))
+
+    movies = Movie.objects.all().only('slug', 'updated_at')
+    urls = []
+    for m in movies:
+        urls.append({
+            'loc': request.build_absolute_uri(reverse('movie_detail', args=[m.slug])),
+            'lastmod': m.updated_at.strftime('%Y-%m-%d') if m.updated_at else '',
+            'changefreq': 'monthly',
+            'priority': '0.5',
+        })
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for url, priority, changefreq in pages:
+        loc = request.build_absolute_uri(url)
+        xml += f'  <url>\n    <loc>{loc}</loc>\n    <changefreq>{changefreq}</changefreq>\n    <priority>{priority}</priority>\n  </url>\n'
+    for u in urls:
+        xml += '  <url>\n    <loc>' + u['loc'] + '</loc>\n'
+        if u['lastmod']:
+            xml += '    <lastmod>' + u['lastmod'] + '</lastmod>\n'
+        xml += '    <changefreq>' + u['changefreq'] + '</changefreq>\n'
+        xml += '    <priority>' + u['priority'] + '</priority>\n  </url>\n'
+    xml += '</urlset>'
+    return HttpResponse(xml, content_type='application/xml')
+
+
+def robots_txt(request):
+    """robots.txt for crawler guidance."""
+    lines = [
+        'User-agent: *',
+        'Allow: /',
+        'Disallow: /admin/',
+        'Disallow: /login/',
+        'Disallow: /dashboard/',
+        '',
+        'Sitemap: ' + request.build_absolute_uri('/sitemap.xml'),
+    ]
+    return HttpResponse('\n'.join(lines), content_type='text/plain')

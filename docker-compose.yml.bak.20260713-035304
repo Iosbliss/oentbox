@@ -29,7 +29,6 @@ services:
       - static_data:/app/staticfiles
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
-      HOME: /tmp
 
   nginx:
     image: nginx:alpine
