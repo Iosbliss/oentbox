@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Admin sign in — oentbox</title>
+<meta name="description" content="Admin sign in for the oentbox content dashboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red: #e8a33d;
+    --red-hover: #cf8f34;
+    --bg: #0c0d10;
+    --card: rgba(21,23,28,.86);
+    --border: #272b33;
+    --text: #eceef1;
+    --muted: #8b909b;
+    --input-bg: #1b1e24;
+    --input-bg-focus: #23262d;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font-family:'Inter', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* ===== Full-bleed backdrop ===== */
+  .backdrop{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.35) 45%, rgba(0,0,0,.85) 100%),
+      radial-gradient(1200px 700px at 75% 15%, #2e2007 0%, #17130a 32%, #0c0d10 68%),
+      linear-gradient(120deg, #16181d, #0c0d10);
+  }
+  .backdrop::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      repeating-linear-gradient(100deg, rgba(255,255,255,.02) 0 2px, transparent 2px 140px);
+    opacity:.5;
+  }
+
+  /* ===== Header ===== */
+  .topbar{
+    position:relative;
+    z-index:2;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 22px 4.5%;
+  }
+  .brand{
+    display:flex; align-items:center; gap:9px;
+    text-decoration:none;
+    color:var(--text);
+  }
+  .brand__mark{
+    width:30px; height:30px;
+    border-radius:6px;
+    background: var(--red);
+    color:#191204;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:16px;
+  }
+  .brand__name{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:-.02em;
+  }
+  .brand__name em{ font-style:normal; color: var(--red); }
+  .topbar__tag{
+    font-size:13px;
+    color: var(--muted);
+    letter-spacing:.02em;
+  }
+
+  /* ===== Sign-in card ===== */
+  .wrap{
+    position:relative;
+    z-index:2;
+    display:flex;
+    justify-content:center;
+    padding: 40px 16px 90px;
+  }
+  .card{
+    width:100%;
+    max-width: 450px;
+    background: var(--card);
+    border-radius: 4px;
+    padding: 60px 68px 40px;
+  }
+
+  .card h1{
+    font-size: 32px;
+    font-weight:700;
+    margin: 0 0 28px;
+    letter-spacing:-.01em;
+  }
+
+  .error-banner{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background: #4d1a1a;
+    border-left: 4px solid #e87c03;
+    color:#fff;
+    padding: 12px 14px;
+    border-radius: 4px;
+    font-size:14px;
+    margin-bottom: 18px;
+    line-height:1.4;
+  }
+  .error-banner.is-hidden{ display:none; }
+  .error-banner svg{ flex:none; margin-top:2px; color:#e87c03; }
+
+  .field{
+    position:relative;
+    margin-bottom: 16px;
+  }
+  .field input{
+    width:100%;
+    background: var(--input-bg);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 16px 16px 6px;
+    height: 56px;
+    color: var(--text);
+    font-size:16px;
+    font-family:'Inter', sans-serif;
+  }
+  .field input.has-error{
+    border-color:#e87c03;
+    background: #4d1a1a;
+  }
+  .field input:focus{ outline:none; background: var(--input-bg-focus); }
+  .field input::placeholder{ color:transparent; }
+
+  .field label{
+    position:absolute;
+    left:16px;
+    top:16px;
+    color:#8c8c8c;
+    font-size:16px;
+    pointer-events:none;
+    transition: transform .12s ease, font-size .12s ease, top .12s ease, color .12s ease;
+    transform-origin: left top;
+  }
+  .field input:focus + label,
+  .field input:not(:placeholder-shown) + label{
+    top:8px;
+    font-size:11.5px;
+    color:#8c8c8c;
+  }
+
+  .pw-toggle{
+    position:absolute;
+    right:14px;
+    top:0; bottom:0;
+    background:none;
+    border:none;
+    color:#b3b3b3;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    padding:0 4px;
+  }
+  .pw-toggle:hover{ color:#fff; }
+
+  .btn-signin{
+    width:100%;
+    padding: 15px;
+    border-radius: 4px;
+    border:none;
+    background: var(--red);
+    color:#191204;
+    font-weight:600;
+    font-size:16px;
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
+    margin-top: 8px;
+    transition: background .15s ease;
+  }
+  .btn-signin:hover{ background: var(--red-hover); }
+  .btn-signin:disabled{ opacity:.6; cursor:default; }
+
+  .row-between{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin: 14px 0 0;
+    font-size:13.5px;
+    color:#b3b3b3;
+  }
+  .remember{ display:flex; align-items:center; gap:8px; }
+  .remember input{ width:16px; height:16px; accent-color:#737373; }
+  .link{ color:#b3b3b3; text-decoration:none; }
+  .link:hover{ text-decoration:underline; }
+
+  .card__foot{
+    margin-top: 44px;
+    color:#737373;
+    font-size:14.5px;
+    line-height:1.5;
+  }
+  .card__foot a{ color:#fff; text-decoration:none; }
+  .card__foot a:hover{ text-decoration:underline; }
+
+  .demo-note{
+    margin-top: 22px;
+    font-size:12.5px;
+    color:#737373;
+    border-top:1px solid #2b2b2b;
+    padding-top: 14px;
+  }
+  .demo-note code{
+    color:#d0d0d0;
+    background:#2b2b2b;
+    padding:1px 5px;
+    border-radius:3px;
+    font-family: ui-monospace, monospace;
+  }
+
+  .footer{
+    position:relative;
+    z-index:2;
+    padding: 28px 4.5% 40px;
+    color:#737373;
+    font-size:13px;
+    max-width: 990px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 520px){
+    .card{ padding: 44px 28px 28px; background: rgba(0,0,0,.86); }
+    .card h1{ font-size:26px; }
+    .topbar{ padding:18px 20px; }
+    .topbar__tag{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="backdrop" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a href="index.html" class="brand">
+    <span class="brand__mark">O</span>
+    <span class="brand__name">oent<em>box</em></span>
+  </a>
+  <span class="topbar__tag">Admin dashboard</span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h1>Sign in</h1>
+
+    <div class="error-banner{% if not form.errors %} is-hidden{% endif %}" id="errorBanner" role="alert">
+      <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1.15" fill="currentColor"/></svg>
+      <span id="errorText">
+        {% if form.non_field_errors %}
+          {{ form.non_field_errors|striptags }}
+        {% else %}
+          That username and password don't match.
+        {% endif %}
+      </span>
+    </div>
+
+    <form id="loginForm" method="post" action="{{ app_path }}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="field">
+        <input type="text" id="username" name="username" placeholder=" " autocomplete="username" required value="{{ form.username.value|default_if_none:'' }}"{% if form.username.errors %} class="has-error"{% endif %}>
+        <label for="username">Username</label>
+      </div>
+
+      <div class="field">
+        <input type="password" id="password" name="password" placeholder=" " autocomplete="current-password" required style="padding-right:46px;"{% if form.password.errors or form.non_field_errors %} class="has-error"{% endif %}>
+        <label for="password">Password</label>
+        <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">
+          <svg id="eyeIcon" width="19" height="19" viewBox="0 0 24 24"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+
+      <button type="submit" class="btn-signin" id="submitBtn">Sign in</button>
+
+      <div class="row-between">
+        <label class="remember">
+          <input type="checkbox" id="remember" name="remember">
+          Remember me
+        </label>
+        <a href="{% url 'admin:password_change' %}" class="link">Need help?</a>
+      </div>
+    </form>
+
+    <div class="card__foot">
+      Sign in with a staff account to access the oentbox admin dashboard.
+    </div>
+  </div>
+</div>
+
+<footer class="footer">© 2026 oentbox · Admin dashboard</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('loginForm');
+  const username = document.getElementById('username');
+  const password = document.getElementById('password');
+  const submitBtn = document.getElementById('submitBtn');
+  const pwToggle = document.getElementById('pwToggle');
+  const eyeIcon = document.getElementById('eyeIcon');
+
+  pwToggle.addEventListener('click', () => {
+    const showing = password.type === 'text';
+    password.type = showing ? 'password' : 'text';
+    pwToggle.setAttribute('aria-pressed', String(!showing));
+    pwToggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    eyeIcon.innerHTML = showing
+      ? '<path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/>'
+      : '<path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9.9 5.2A10.6 10.6 0 0112 5c6.2 0 10 6.5 10 6.5a15.6 15.6 0 01-3.2 3.9M6.4 6.4A15.7 15.7 0 002 11.5S5.8 18 12 18c1.2 0 2.3-.2 3.3-.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.9 14.1A3 3 0 0114 9.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  });
+
+  form.addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in...';
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "name": "oentbox — Entertainment, Reimagined",
+  "short_name": "oentbox",
+  "description": "A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0B0D10",
+  "theme_color": "#0B0D10",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["entertainment", "video"],
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse",
+      "short_name": "Browse",
+      "url": "/browse.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "YouTube videos",
+      "short_name": "YouTube",
+      "url": "/youtube.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Downloads",
+      "short_name": "Downloads",
+      "url": "/downloads.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

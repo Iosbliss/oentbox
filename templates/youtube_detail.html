@@ -1,0 +1,284 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>{% if video %}{{ video.title }}{% else %}Video details{% endif %} - oentbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link rel="manifest" href="{% static 'manifest.json' %}">
+<meta name="theme-color" content="#0B0D10">
+<link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="{% static 'img/icon-192.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="oentbox">
+</head>
+<body data-page="youtube">
+
+<header class="topbar" id="topbar">
+  <div class="topbar__inner">
+    <button class="iconbtn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span class="hamburger"><span></span><span></span><span></span></span>
+    </button>
+    <a href="/" class="brand">
+      <span class="brand__mark">O</span>
+      <span class="brand__name">oent<em>box</em></span>
+    </a>
+    <div class="topbar__actions">
+      <button class="iconbtn" id="searchBtn" aria-label="Search">
+        <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a1 1 0 011 1v1a1 1 0 11-2 0V4a1 1 0 011-1zm0 15a5 5 0 100-10 5 5 0 000 10zm9-6a1 1 0 010 2h-1a1 1 0 110-2h1zM4 12a1 1 0 010 2H3a1 1 0 110-2h1zm14.36 6.36a1 1 0 01-1.41 0l-.71-.71a1 1 0 111.41-1.41l.71.71a1 1 0 010 1.41zM7.05 6.05a1 1 0 01-1.41 0l-.71-.71A1 1 0 116.34 3.93l.71.71a1 1 0 010 1.41zm11.31-2.12a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM6.34 18.66a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM12 20a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1z"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="navrow" aria-label="Primary">
+    <ul class="navrow__list">
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="nollywood">Nollywood</button>
+        <div class="mega">
+          <a href="/browse.html?cat=nollywood-movies">Movies</a>
+          <a href="/browse.html?cat=nollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="hollywood">Hollywood</button>
+        <div class="mega">
+          <a href="/browse.html?cat=hollywood-movies">Movies</a>
+          <a href="/browse.html?cat=hollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="drama">World Drama</button>
+        <div class="mega">
+          <a href="/browse.html?cat=korean-drama">Korean</a>
+          <a href="/browse.html?cat=turkish-drama">Turkish</a>
+          <a href="/browse.html?cat=chinese-drama">Chinese</a>
+          <a href="/browse.html?cat=japanese-drama">Japanese</a>
+          <a href="/browse.html?cat=filipino-drama">Filipino</a>
+        </div>
+      </li>
+      <li><a class="navrow__link" data-navkey="anime" href="/browse.html?cat=anime">Anime</a></li>
+      <li><a class="navrow__link" data-navkey="az" href="/browse.html?cat=all">A–Z Library</a></li>
+      <li><a class="navrow__link" data-navkey="saved" href="/saved.html">My list</a></li>
+      <li><a class="navrow__link" data-navkey="youtube" href="/youtube.html">YouTube videos</a></li>
+      <li><a class="navrow__link" data-navkey="downloads" href="/downloads.html">Downloads</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-overlay__box">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search titles, genres, actors…" aria-label="Search">
+    <button class="iconbtn" id="closeSearch" aria-label="Close search">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+  <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
+</div>
+
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Browse</span>
+    <a href="/browse.html?cat=nollywood-movies">Nollywood</a>
+    <a href="/browse.html?cat=hollywood-movies">Hollywood</a>
+    <a href="/browse.html?cat=korean-drama">World Drama</a>
+    <a href="/browse.html?cat=anime">Anime</a>
+    <a href="/browse.html?cat=all">A–Z Library</a>
+  </div>
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Watch</span>
+    <a href="/youtube.html">YouTube videos</a>
+    <a href="/downloads.html">Downloads</a>
+    <a href="/saved.html">Saved list</a>
+  </div>
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Account</span>
+    <a href="/about.html">About</a>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<main class="youtube-detail-page">
+  {% if error %}
+  <div class="youtube-error">
+    <h1>Video unavailable</h1>
+    <p>{{ error }}</p>
+    <a class="btn btn--primary" href="/youtube.html">Back to videos</a>
+  </div>
+  {% else %}
+  <a class="youtube-back" href="/youtube.html">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6"/></svg>
+    Back to YouTube videos
+  </a>
+
+  <section class="youtube-detail-hero">
+    <div class="youtube-detail-visual">
+      {% if video.stream_url %}
+      <video controls controlslist="nodownload noplaybackrate" disablepictureinpicture preload="metadata" poster="{{ video.thumbnail }}" playsinline>
+        <source src="{{ video.stream_url }}" type="video/mp4">
+        Your browser cannot play this video.
+      </video>
+      {% else %}
+      <p class="youtube-status">Video playback is unavailable right now.</p>
+      {% endif %}
+    </div>
+    <div class="youtube-detail-copy">
+      <p class="youtube-kicker">VIDEO DETAILS</p>
+      <h1>{{ video.title }}</h1>
+      <p class="youtube-detail-channel">
+        <span class="youtube-detail-channel-avatar" data-channel-url="{{ video.channel_url }}" data-channel-id="{{ video.channel_id }}">
+          {% if video.channel_thumbnail %}<img src="{{ video.channel_thumbnail }}" alt="">{% endif %}
+        </span>
+        <span>{{ video.channel }}</span>
+      </p>
+      <div class="youtube-detail-stats">
+        <span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 7v5l4 2"/></svg>{{ video.duration|default:"Duration unavailable" }}</span>
+        <span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>{{ video.views|default:"Views unavailable" }} views</span>
+        <span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M7 22V10M2 13v7a2 2 0 002 2h11.3a2 2 0 002-1.7l1.4-9A2 2 0 0016.7 9H13V5a2 2 0 00-2-2L7 10"/></svg>{{ video.likes|default:"Likes unavailable" }} likes</span>
+      </div>
+      <div class="youtube-detail-actions">
+        <div class="youtube-download" data-download-url="{{ video.url }}">
+          <label for="youtubeDownloadFormat">Format</label>
+          <select id="youtubeDownloadFormat">
+            <option value="video">Best video (MP4)</option>
+            <option value="video_720">720p video (MP4)</option>
+            <option value="video_480">480p video (MP4)</option>
+            <option value="audio">Audio (M4A)</option>
+            <option value="audio_mp3">Audio (MP3)</option>
+          </select>
+          <button class="btn btn--primary" id="youtubeDownloadButton" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3v10.5l3.5-3.5 1.4-1.4L12 16.8l-4.9-4.9 1.4-1.4L12 13.5V3zM5 19h14v2H5z"/></svg>
+            Download
+          </button>
+          <div class="youtube-download__progress" id="youtubeDownloadProgress" hidden>
+            <div class="youtube-download__track"><span id="youtubeDownloadBar"></span></div>
+            <span id="youtubeDownloadStatus" role="status" aria-live="polite">Preparing download...</span>
+          </div>
+        </div>
+      </div>
+      <p class="youtube-file-size">Estimated file size: <strong>{{ video.file_size }}</strong></p>
+    </div>
+  </section>
+
+  <details class="youtube-about">
+    <summary><span><small>ABOUT THIS VIDEO</small><strong>About the video</strong></span><b aria-hidden="true">+</b></summary>
+    {% if video.description %}<p>{{ video.description }}</p>{% else %}<p class="youtube-status">No description available for this video.</p>{% endif %}
+  </details>
+
+  <details class="youtube-comments">
+    <summary><span><small>COMMUNITY</small><strong>Comments{% if comments %} <em>({{ comments|length }})</em>{% endif %}</strong></span><b aria-hidden="true">+</b></summary>
+    {% if comments %}
+    <div class="youtube-comment-list">
+      {% for comment in comments %}
+      <article class="youtube-comment">
+        <div class="youtube-comment__avatar">{% if comment.author_thumbnail %}<img src="{{ comment.author_thumbnail }}" alt="">{% else %}{{ comment.author|first|upper }}{% endif %}</div>
+        <div>
+          <h3>{{ comment.author }}</h3>
+          <p>{{ comment.text }}</p>
+          {% if comment.likes %}<small>{{ comment.likes }} likes</small>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="youtube-status">Comments are unavailable for this video.</p>
+    {% endif %}
+  </details>
+
+  <section class="youtube-similar">
+    <div class="youtube-section-heading">
+      <p class="youtube-kicker">KEEP EXPLORING</p>
+      <h2>Similar videos</h2>
+    </div>
+    <div class="youtube-grid">
+      {% for item in similar_videos %}
+      <a class="youtube-card" href="/youtube/video.html?id={{ item.id }}">
+        <span class="youtube-card__image">
+          <img src="{{ item.thumbnail }}" alt="" loading="lazy">
+          <span class="youtube-card__source">YouTube</span>
+          <span class="youtube-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.55)"/><path d="M10 8l7 4-7 4z" fill="#fff"/></svg></span>
+          {% if item.duration %}<span class="youtube-duration">{{ item.duration }}</span>{% endif %}
+        </span>
+        <span class="youtube-card__body">
+          <span class="youtube-card__avatar" data-channel-url="{{ item.channel_url }}" data-channel-id="{{ item.channel_id }}">
+            {% if item.channel_thumbnail %}<img src="{{ item.channel_thumbnail }}" alt="" loading="lazy">{% else %}{{ item.channel|default:"Y"|first|upper }}{% endif %}
+          </span>
+          <span class="youtube-card__text">
+            <strong>{{ item.title }}</strong>
+            <span class="youtube-card__channel">{{ item.channel }}</span>
+            <span class="youtube-card__stats">{% if item.views %}{{ item.views }} views{% else %}Views unavailable{% endif %}{% if item.likes %} · {{ item.likes }} likes{% endif %}</span>
+          </span>
+        </span>
+      </a>
+      {% empty %}
+      <p class="youtube-status">No similar videos found right now.</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</main>
+
+<footer class="footer">
+  <div class="footer__grid">
+    <div>
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark">O</span>
+        <span class="brand__name">oent<em>box</em></span>
+      </a>
+      <p class="footer__blurb">A concept redesign — modernized layout and UI patterns, built for demonstration.</p>
+    </div>
+    <div>
+      <h4>Browse</h4>
+      <a href="/browse.html?cat=nollywood-movies">Nollywood</a>
+      <a href="/browse.html?cat=hollywood-movies">Hollywood</a>
+      <a href="/browse.html?cat=korean-drama">World Drama</a>
+      <a href="/browse.html?cat=anime">Anime</a>
+    </div>
+    <div>
+      <h4>Info</h4>
+      <a href="/about.html">About us</a>
+      <a href="/saved.html">Saved list</a>
+      <a href="/youtube.html">YouTube videos</a>
+    </div>
+    <div>
+      <h4>Get updates</h4>
+      <form class="footer__form" onsubmit="return false;">
+        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <button class="btn btn--primary" type="submit">Join</button>
+      </form>
+    </div>
+  </div>
+  <div class="footer__bottom">© 2026 oentbox · UI concept demo</div>
+</footer>
+
+<nav class="tabbar" aria-label="Bottom navigation">
+  <a class="tabbar__item" data-tab="home" href="/">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
+    <span>Home</span>
+  </a>
+  <a class="tabbar__item" data-tab="browse" href="/browse.html?cat=all">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
+    <span>Browse</span>
+  </a>
+  <button class="tabbar__item" data-tab="search-tab" id="tabSearch">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Search</span>
+  </button>
+  <a class="tabbar__item" data-tab="saved" href="/saved.html">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/></svg>
+    <span>Saved</span>
+  </a>
+</nav>
+
+<script src="{% static 'js/common.js' %}"></script>
+<script src="{% static 'js/youtube.js' %}?v=4"></script>
+</body>
+</html>

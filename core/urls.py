@@ -1,0 +1,34 @@
+from django.urls import path
+
+from . import views
+
+
+urlpatterns = [
+    path("", views.home, name="home"),
+    path("sw.js", views.service_worker, name="service_worker"),
+    path("index.html", views.home, name="home_file"),
+    path("about.html", views.about, name="about"),
+    path("youtube.html", views.youtube_page, name="youtube"),
+    path("youtube/video.html", views.youtube_video_detail, name="youtube_video_detail"),
+    path("downloads.html", views.download_manager, name="download_manager"),
+    path("browse.html", views.browse, name="browse"),
+    path("saved.html", views.saved, name="saved"),
+    path("video_detail.html", views.title_detail, name="video_detail"),
+    path("title.html", views.title_detail, name="title"),
+    path("api/track-activity/", views.track_activity, name="track_activity"),
+    path("api/account/register/", views.register, name="account_register"),
+    path("api/account/login/", views.account_login, name="account_login"),
+    path("api/account/logout/", views.account_logout, name="account_logout"),
+    path("api/saved/", views.saved_api, name="saved_api"),
+    path("api/saved/<str:movie_id>/add/", views.save_movie, name="save_movie"),
+    path("api/saved/<str:movie_id>/remove/", views.unsave_movie, name="unsave_movie"),
+    path("api/youtube/search/", views.youtube_search, name="youtube_search"),
+    path("api/youtube/channel-avatar/", views.youtube_channel_avatar, name="youtube_channel_avatar"),
+    path("api/youtube/download/", views.youtube_download, name="youtube_download"),
+    path("api/youtube/download/<str:job_id>/", views.youtube_download_status, name="youtube_download_status"),
+    path("api/youtube/download/<str:job_id>/file/", views.youtube_download_file, name="youtube_download_file"),
+    path("api/youtube/download/<str:job_id>/pause/", views.youtube_download_pause, name="youtube_download_pause"),
+    path("api/youtube/download/<str:job_id>/resume/", views.youtube_download_resume, name="youtube_download_resume"),
+    path("api/youtube/download/<str:job_id>/cancel/", views.youtube_download_cancel, name="youtube_download_cancel"),
+    path("admin/run-scraper/", views.run_scraper, name="run_scraper"),
+]

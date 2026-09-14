@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Dashboard — oentbox</title>
+<meta name="description" content="Content and performance dashboard for the oentbox library.">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body data-page="dashboard">
+
+<!-- ===== Top App Bar ===== -->
+<header class="topbar" id="topbar">
+  <div class="topbar__inner">
+    <button class="iconbtn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span class="hamburger"><span></span><span></span><span></span></span>
+    </button>
+
+    <a href="{% url 'home' %}" class="brand">
+      <span class="brand__mark">O</span>
+      <span class="brand__name">oent<em>box</em></span>
+    </a>
+
+    <div class="topbar__actions">
+      <button class="iconbtn" id="searchBtn" aria-label="Search">
+        <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a1 1 0 011 1v1a1 1 0 11-2 0V4a1 1 0 011-1zm0 15a5 5 0 100-10 5 5 0 000 10zm9-6a1 1 0 010 2h-1a1 1 0 110-2h1zM4 12a1 1 0 010 2H3a1 1 0 110-2h1zm14.36 6.36a1 1 0 01-1.41 0l-.71-.71a1 1 0 111.41-1.41l.71.71a1 1 0 010 1.41zM7.05 6.05a1 1 0 01-1.41 0l-.71-.71A1 1 0 116.34 3.93l.71.71a1 1 0 010 1.41zm11.31-2.12a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM6.34 18.66a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM12 20a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Desktop nav -->
+  <nav class="navrow" aria-label="Primary">
+    <ul class="navrow__list">
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="nollywood">Nollywood</button>
+        <div class="mega">
+          <a href="{% url 'browse' %}?cat=nollywood-movies">Movies</a>
+          <a href="{% url 'browse' %}?cat=nollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="hollywood">Hollywood</button>
+        <div class="mega">
+          <a href="{% url 'browse' %}?cat=hollywood-movies">Movies</a>
+          <a href="{% url 'browse' %}?cat=hollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="drama">World Drama</button>
+        <div class="mega">
+          <a href="{% url 'browse' %}?cat=korean-drama">Korean</a>
+          <a href="{% url 'browse' %}?cat=turkish-drama">Turkish</a>
+          <a href="{% url 'browse' %}?cat=chinese-drama">Chinese</a>
+          <a href="{% url 'browse' %}?cat=japanese-drama">Japanese</a>
+          <a href="{% url 'browse' %}?cat=filipino-drama">Filipino</a>
+        </div>
+      </li>
+      <li><a class="navrow__link" data-navkey="anime" href="{% url 'browse' %}?cat=anime">Anime</a></li>
+      <li><a class="navrow__link" data-navkey="az" href="{% url 'browse' %}?cat=all">A–Z Library</a></li>
+      <li><a class="navrow__link" data-navkey="dashboard" href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ===== Search overlay ===== -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-overlay__box">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search titles, genres, actors…" aria-label="Search">
+    <button class="iconbtn" id="closeSearch" aria-label="Close search">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+  <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
+</div>
+
+<!-- ===== Mobile fullscreen menu ===== -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Browse</span>
+    <a href="{% url 'browse' %}?cat=nollywood-movies">Nollywood</a>
+    <a href="{% url 'browse' %}?cat=hollywood-movies">Hollywood</a>
+    <a href="{% url 'browse' %}?cat=korean-drama">World Drama</a>
+    <a href="{% url 'browse' %}?cat=anime">Anime</a>
+    <a href="{% url 'browse' %}?cat=all">A–Z Library</a>
+    <a href="{% url 'admin_dashboard' %}">Dashboard</a>
+  </div>
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Account</span>
+    <a href="{% url 'saved' %}">Saved list</a>
+    <a href="{% url 'about' %}">About</a>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<main>
+  <div class="dash">
+
+    <div class="dash__head">
+      <div>
+        <h1>Download dashboard</h1>
+        <p>Downloads and plays across the oentbox catalogue.</p>
+      </div>
+      <div class="dash__range" id="rangeToggle" role="group" aria-label="Time range">
+        <button data-range="7" class="is-active">7d</button>
+        <button data-range="30">30d</button>
+        <button data-range="90">90d</button>
+      </div>
+    </div>
+
+    <details class="panel admin-tools">
+      <summary class="admin-tools__summary">
+        <span>
+          <strong id="admin-tools-title">Django administration</strong>
+          <small>Manage authentication, permissions, and built-in admin tools.</small>
+        </span>
+        <span class="admin-tools__user">Signed in as {{ request.user.get_username }}</span>
+      </summary>
+      <div class="admin-tools__body">
+      <div class="admin-tools__stats" aria-label="Authentication overview">
+        <div><strong>{{ admin_user_count }}</strong><span>Total users</span></div>
+        <div><strong>{{ admin_staff_count }}</strong><span>Staff users</span></div>
+        <div><strong>{{ admin_group_count }}</strong><span>Groups</span></div>
+        <div><strong>{{ admin_active_count }}</strong><span>Active users</span></div>
+      </div>
+      <div class="admin-tools__links">
+        <a class="admin-tool" href="{% url 'admin:index' %}">
+          <strong>Admin home</strong>
+          <span>Open the standard Django admin</span>
+        </a>
+        <a class="admin-tool" href="{% url 'admin:auth_user_changelist' %}">
+          <strong>Users</strong>
+          <span>Create users and manage staff access</span>
+        </a>
+        {% if perms.auth.add_user %}<a class="admin-tool" href="{% url 'admin:auth_user_add' %}">
+          <strong>Add user</strong>
+          <span>Create a new account</span>
+        </a>{% endif %}
+        <a class="admin-tool" href="{% url 'admin:auth_group_changelist' %}">
+          <strong>Groups and permissions</strong>
+          <span>Control roles and permissions</span>
+        </a>
+        {% if perms.auth.add_group %}<a class="admin-tool" href="{% url 'admin:auth_group_add' %}">
+          <strong>Add group</strong>
+          <span>Create a permission role</span>
+        </a>{% endif %}
+        <a class="admin-tool" href="{% url 'admin:password_change' %}">
+          <strong>Change password</strong>
+          <span>Update your account password</span>
+        </a>
+        <form class="admin-tool admin-tool--logout" method="post" action="{% url 'admin:logout' %}">
+          {% csrf_token %}
+          <button type="submit">
+            <strong>Log out</strong>
+            <span>End this admin session</span>
+          </button>
+        </form>
+      </div>
+      <div class="admin-tools__recent">
+        <div class="admin-tools__recent-head">
+          <strong>Recent users</strong>
+          <a href="{% url 'admin:auth_user_changelist' %}">View all</a>
+        </div>
+        {% for admin_user in admin_recent_users %}
+        <div class="admin-user-row">
+          <span class="admin-user-row__avatar">{{ admin_user.username|first|upper }}</span>
+          <span class="admin-user-row__name">{{ admin_user.get_username }}</span>
+          <span class="admin-user-row__email">{{ admin_user.email|default:"No email" }}</span>
+          {% if admin_user.is_staff %}<span class="pill pill--hd">Staff</span>{% else %}<span class="pill pill--none">User</span>{% endif %}
+        </div>
+        {% empty %}
+        <p class="panel__sub">No users have been created yet.</p>
+        {% endfor %}
+      </div>
+        </div>
+      </details>
+
+    <!-- Stat cards -->
+    <div class="dash__stats" id="statCards" data-scrape-url="{% url 'run_scraper' %}" data-scrape-status-url="{% url 'scraper_status' %}" data-dashboard-data-url="{% url 'dashboard_data' %}"></div>
+
+    <!-- Charts row -->
+    <div class="dash__grid">
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Downloads &amp; trailer watches over time</h2>
+          <span class="row__more" id="lcTotal"></span>
+        </div>
+        <div class="dash__range" id="metricToggle" role="group" aria-label="Activity metric" style="margin:-4px 0 12px;">
+          <button data-metric="download" class="is-active">Downloads</button>
+          <button data-metric="trailer_watch">Trailer watches</button>
+        </div>
+        <p class="panel__sub">Real activity recorded from your website.</p>
+        <svg class="linechart" id="lineChart" viewBox="0 0 640 220" preserveAspectRatio="none"></svg>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Titles by type</h2>
+        </div>
+        <div class="donut-wrap">
+          <svg width="150" height="150" viewBox="0 0 150 150" id="donutChart"></svg>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel scrape-history-panel">
+      <div class="panel__head">
+        <h2>Scrape history analysis</h2>
+        <span class="row__more" id="historyUpdated">Live</span>
+      </div>
+      <div class="history-summary" id="historySummary"></div>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <div class="dash__grid">
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Titles by category</h2>
+        </div>
+        <div class="barlist" id="catBarlist"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Latest scraped titles</h2>
+        </div>
+        <div class="barlist" id="topBarlist"></div>
+      </section>
+    </div>
+
+    <!-- Content management table -->
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Content library</h2>
+        <span class="row__more" id="tableCount"></span>
+      </div>
+      <div class="dtable__toolbar">
+        <input type="text" class="dtable__search" id="tableSearch" placeholder="Search titles…">
+        <select class="dtable__select" id="filterCategory">
+          <option value="all">All categories</option>
+        </select>
+        <select class="dtable__select" id="filterType">
+          <option value="all">All types</option>
+          <option value="Movie">Movie</option>
+          <option value="Series">Series</option>
+          <option value="Live">Live</option>
+        </select>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable" id="contentTable">
+          <thead>
+            <tr>
+              <th data-sort="title">Title <span class="sort-arrow">↕</span></th>
+              <th data-sort="category">Category <span class="sort-arrow">↕</span></th>
+              <th data-sort="type">Type <span class="sort-arrow">↕</span></th>
+              <th data-sort="year">Year <span class="sort-arrow">↕</span></th>
+              <th data-sort="scraped_at">Scraped <span class="sort-arrow">↕</span></th>
+              <th data-sort="download_count">Files</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ===== Footer (desktop) ===== -->
+<footer class="footer">
+  <div class="footer__grid">
+    <div>
+      <a href="{% url 'home' %}" class="brand brand--footer">
+        <span class="brand__mark">O</span>
+        <span class="brand__name">oent<em>box</em></span>
+      </a>
+      <p class="footer__blurb">A concept redesign — modernized layout and UI patterns, built for demonstration.</p>
+    </div>
+    <div>
+      <h4>Browse</h4>
+      <a href="{% url 'browse' %}?cat=nollywood-movies">Nollywood</a>
+      <a href="{% url 'browse' %}?cat=hollywood-movies">Hollywood</a>
+      <a href="{% url 'browse' %}?cat=korean-drama">World Drama</a>
+      <a href="{% url 'browse' %}?cat=anime">Anime</a>
+    </div>
+    <div>
+      <h4>Info</h4>
+      <a href="{% url 'about' %}">About us</a>
+      <a href="{% url 'saved' %}">Saved list</a>
+    </div>
+    <div>
+      <h4>Get updates</h4>
+      <form class="footer__form" onsubmit="return false;">
+        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <button class="btn btn--primary" type="submit">Join</button>
+      </form>
+    </div>
+  </div>
+  <div class="footer__bottom">© 2026 oentbox · UI concept demo</div>
+</footer>
+
+<!-- ===== Mobile bottom tab bar (native app feel) ===== -->
+<nav class="tabbar" aria-label="Bottom navigation">
+  <a class="tabbar__item" data-tab="home" href="{% url 'home' %}">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
+    <span>Home</span>
+  </a>
+  <a class="tabbar__item" data-tab="browse" href="{% url 'browse' %}?cat=all">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
+    <span>Browse</span>
+  </a>
+  <button class="tabbar__item" data-tab="search-tab" id="tabSearch">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Search</span>
+  </button>
+  <a class="tabbar__item" data-tab="saved" href="{% url 'saved' %}">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/></svg>
+    <span>Saved</span>
+  </a>
+</nav>
+
+<script src="{% static 'js/data.js' %}"></script>
+<script src="{% static 'js/common.js' %}"></script>
+{{ dashboard_titles|json_script:"dashboard-data" }}
+{{ dashboard_activity|json_script:"activity-data" }}
+<script src="{% static 'dashboard.js' %}"></script>
+</body>
+</html>

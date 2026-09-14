@@ -1,0 +1,362 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Video Detail — oentbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link rel="manifest" href="{% static 'manifest.json' %}">
+<meta name="theme-color" content="#0B0D10">
+<link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="{% static 'img/icon-192.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="oentbox">
+</head>
+<body data-page="title">
+
+<header class="topbar" id="topbar">
+  <div class="topbar__inner">
+    <button class="iconbtn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span class="hamburger"><span></span><span></span><span></span></span>
+    </button>
+    <a href="index.html" class="brand">
+      <span class="brand__mark">O</span>
+      <span class="brand__name">oent<em>box</em></span>
+    </a>
+    <div class="topbar__actions">
+      <button class="iconbtn" id="searchBtn" aria-label="Search">
+        <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a1 1 0 011 1v1a1 1 0 11-2 0V4a1 1 0 011-1zm0 15a5 5 0 100-10 5 5 0 000 10zm9-6a1 1 0 010 2h-1a1 1 0 110-2h1zM4 12a1 1 0 010 2H3a1 1 0 110-2h1zm14.36 6.36a1 1 0 01-1.41 0l-.71-.71a1 1 0 111.41-1.41l.71.71a1 1 0 010 1.41zM7.05 6.05a1 1 0 01-1.41 0l-.71-.71A1 1 0 116.34 3.93l.71.71a1 1 0 010 1.41zm11.31-2.12a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM6.34 18.66a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.41l.71-.71a1 1 0 011.41 0zM12 20a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1z"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="navrow" aria-label="Primary">
+    <ul class="navrow__list">
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="nollywood">Nollywood</button>
+        <div class="mega">
+          <a href="browse.html?cat=nollywood-movies">Movies</a>
+          <a href="browse.html?cat=nollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="hollywood">Hollywood</button>
+        <div class="mega">
+          <a href="browse.html?cat=hollywood-movies">Movies</a>
+          <a href="browse.html?cat=hollywood-series">TV Series</a>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="navrow__link" data-navkey="drama">World Drama</button>
+        <div class="mega">
+          <a href="browse.html?cat=korean-drama">Korean</a>
+          <a href="browse.html?cat=turkish-drama">Turkish</a>
+          <a href="browse.html?cat=chinese-drama">Chinese</a>
+          <a href="browse.html?cat=japanese-drama">Japanese</a>
+          <a href="browse.html?cat=filipino-drama">Filipino</a>
+        </div>
+      </li>
+      <li><a class="navrow__link" data-navkey="anime" href="browse.html?cat=anime">Anime</a></li>
+      <li><a class="navrow__link" data-navkey="az" href="browse.html?cat=all">A–Z Library</a></li>
+      <li><a class="navrow__link" data-navkey="saved" href="saved.html">My list</a></li>
+      <li><a class="navrow__link" data-navkey="youtube" href="youtube.html">YouTube videos</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-overlay__box">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Search titles, genres, actors…" aria-label="Search">
+    <button class="iconbtn" id="closeSearch" aria-label="Close search">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+  <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
+</div>
+
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Browse</span>
+    <a href="browse.html?cat=nollywood-movies">Nollywood</a>
+    <a href="browse.html?cat=hollywood-movies">Hollywood</a>
+    <a href="browse.html?cat=korean-drama">World Drama</a>
+    <a href="browse.html?cat=anime">Anime</a>
+    <a href="browse.html?cat=all">A–Z Library</a>
+  </div>
+  <div class="mobile-menu__group">
+    <span class="mobile-menu__label">Account</span>
+    <a href="saved.html">Saved list</a>
+    <a href="about.html">About</a>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<main>
+  {% if has_movie %}
+  <section class="detail-hero" id="detailHero" style="background: linear-gradient(to right, rgba(0,0,0,0.9), rgba(0,0,0,0.4)), url('{{ movie.thumbnail }}') center/cover no-repeat;">
+    <div class="detail-hero__inner video-detail__hero-inner">
+      {% if movie.thumbnail %}
+      <div class="video-detail__poster">
+        <img src="{{ movie.thumbnail }}" alt="{{ movie.title }} poster">
+      </div>
+      {% endif %}
+      <div class="video-detail__hero-copy">
+        <div class="video-detail__eyebrow">
+          <span class="tag tag--new video-detail__tag">{{ movie.category|default:"Movie"|title }}</span>
+          {% if movie.video_info.Status %}
+          <span class="video-detail__status">{{ movie.video_info.Status }}</span>
+          {% endif %}
+        </div>
+        <h1 class="video-detail__title">{{ movie.title }}</h1>
+        <p class="detail-hero__meta video-detail__meta">
+          {% if movie.year %}{{ movie.year }} • {% endif %}
+          {% if movie.category %}{{ movie.category|title }}{% endif %}
+          {% if movie.video_info.Type %} • {{ movie.video_info.Type }}{% endif %}
+        </p>
+        {% if movie.video_info.Genre %}
+        <div class="video-detail__chips">
+          <span class="video-detail__chip">{{ movie.video_info.Genre }}</span>
+        </div>
+        {% endif %}
+        <div class="detail-actions video-detail__actions">
+        <a href="{{ movie.link }}" class="btn btn--primary video-detail__cta" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Watch Now
+        </a>
+        <button class="btn btn--ghost js-my-list-button" type="button" data-movie-id="{{ movie.id }}">+ My list</button>
+        <button
+          class="btn btn--ghost"
+          type="button"
+          onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href = 'browse.html?cat=all'; }"
+        >← Back</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="detail-body video-detail">
+    <div class="video-detail__layout">
+      <div class="video-detail__main">
+        <section class="video-panel">
+          <div class="video-panel__header">
+            <span class="video-panel__kicker">About this title</span>
+            <h2>Synopsis</h2>
+          </div>
+          <p class="detail-body__synopsis video-detail__synopsis">
+            {{ movie.description|default:"No description available for this movie." }}
+          </p>
+        </section>
+
+        {% if movie.trailer_embed_url or movie.trailer_url %}
+        <section class="video-panel">
+          <div class="video-panel__header">
+            <span class="video-panel__kicker">Watch</span>
+            <h2>Trailer</h2>
+          </div>
+          {% if movie.trailer_embed_url %}
+          <div class="video-detail__trailer-frame">
+            <div class="video-detail__trailer-embed">
+              <iframe
+                id="trailerFrame"
+                data-movie-id="{{ movie.id }}"
+                data-movie-title="{{ movie.title }}"
+                src="{{ movie.trailer_embed_url }}&rel=0&modestbranding=1&fs=0"
+                title="{{ movie.trailer_title|default:movie.title }}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen
+                style="position: absolute; inset: 0; width: 100%; height: 100%; border: 0;"
+              ></iframe>
+            </div>
+          </div>
+          {% endif %}
+        </section>
+        {% endif %}
+
+        {% if movie.download_links %}
+        <section class="video-panel">
+          <div class="video-panel__header">
+            <span class="video-panel__kicker">Get the files</span>
+            <h2>Download Links</h2>
+            {% if movie.download_help_url %}
+            <a href="{{ movie.download_help_url }}" target="_blank" class="btn btn--ghost">How to download</a>
+            {% endif %}
+          </div>
+          <div class="video-detail__downloads">
+            {% for item in movie.download_links %}
+            <div class="video-detail__download-item">
+              <div>
+                <div class="video-detail__download-label">{{ item.label|default:"Download" }}</div>
+                <div class="video-detail__download-text">{{ item.text }}</div>
+              </div>
+              <a href="/downloads.html?url={{ item.url|urlencode }}&title={{ movie.title|urlencode }}&label={{ item.label|urlencode }}" class="btn btn--primary js-download-link" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Download</a>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if movie.screenshots %}
+        <section class="video-panel">
+          <div class="video-panel__header">
+            <span class="video-panel__kicker">Preview</span>
+            <h2>Screenshot</h2>
+          </div>
+          <div class="video-detail__screenshots">
+            {% for screenshot in movie.screenshots %}
+            <a href="{{ screenshot }}" target="_blank" rel="noopener">
+              <img src="{{ screenshot }}" alt="{{ movie.title }} screenshot" loading="lazy">
+            </a>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+
+      <aside class="video-detail__sidebar">
+        {% if movie.video_info %}
+        <section class="video-panel">
+          <div class="video-panel__header">
+            <span class="video-panel__kicker">Release details</span>
+            <h2>Video Information</h2>
+          </div>
+          <div class="video-detail__info-grid">
+            {% for key, value in movie.video_info.items %}
+            <div class="video-detail__info-item">
+              <div class="video-detail__info-label">{{ key }}</div>
+              {% if key == "Imdb" %}
+              <a href="{{ value }}" target="_blank" class="video-detail__info-link">{{ value }}</a>
+              {% else %}
+              <div class="video-detail__info-value">{{ value }}</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+      </aside>
+    </div>
+  </section>
+
+  {% if related_movies %}
+  <section class="row video-detail__related" aria-labelledby="row-related">
+    <div class="row__head video-detail__related-head">
+      <h2 id="row-related">You may also like</h2>
+    </div>
+    <div class="row__track video-detail__related-grid">
+      {% for related in related_movies %}
+      <article class="card" data-movie-id="{{ related.id }}">
+        <a class="card__media" href="video_detail.html?id={{ related.id }}">
+          {% if related.thumbnail %}
+          <img src="{{ related.thumbnail }}" alt="{{ related.title }}" loading="lazy">
+          {% else %}
+          <div class="card__placeholder" data-glyph="film"></div>
+          {% endif %}
+          <span class="card__badge">{{ related.category|default:"Movie"|title }}</span>
+        </a>
+        <div class="card__info video-detail__related-info">
+          <h3 class="card__title"><a href="video_detail.html?id={{ related.id }}">{{ related.title|truncatechars:35 }}</a></h3>
+          <p class="card__meta">{% if related.year %}{{ related.year }}{% endif %}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% else %}
+  <section style="padding: 60px 24px; text-align: center;">
+    <h1 style="font-size: 32px; margin-bottom: 16px;">Movie Not Found</h1>
+    <p style="color: var(--text-2); margin-bottom: 24px;">The movie you're looking for doesn't exist or hasn't been scraped yet.</p>
+    <a href="browse.html" class="btn btn--primary">Browse Movies</a>
+  </section>
+  {% endif %}
+</main>
+
+<footer class="footer">
+  <div class="footer__grid">
+    <div>
+      <a href="index.html" class="brand brand--footer">
+        <span class="brand__mark">O</span>
+        <span class="brand__name">oent<em>box</em></span>
+      </a>
+      <p class="footer__blurb">A concept redesign — modernized layout and UI patterns, built for demonstration.</p>
+    </div>
+    <div>
+      <h4>Browse</h4>
+      <a href="browse.html?cat=nollywood-movies">Nollywood</a>
+      <a href="browse.html?cat=hollywood-movies">Hollywood</a>
+      <a href="browse.html?cat=korean-drama">World Drama</a>
+      <a href="browse.html?cat=anime">Anime</a>
+    </div>
+    <div>
+      <h4>Info</h4>
+      <a href="about.html">About us</a>
+      <a href="saved.html">Saved list</a>
+    </div>
+    <div>
+      <h4>Get updates</h4>
+      <form class="footer__form" onsubmit="return false;">
+        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <button class="btn btn--primary" type="submit">Join</button>
+      </form>
+    </div>
+  </div>
+  <div class="footer__bottom">© 2026 oentbox · UI concept demo</div>
+</footer>
+
+<nav class="tabbar" aria-label="Bottom navigation">
+  <a class="tabbar__item" data-tab="home" href="index.html">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
+    <span>Home</span>
+  </a>
+  <a class="tabbar__item" data-tab="browse" href="browse.html?cat=all">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
+    <span>Browse</span>
+  </a>
+  <button class="tabbar__item" data-tab="search-tab" id="tabSearch">
+    <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Search</span>
+  </button>
+  <a class="tabbar__item" data-tab="saved" href="saved.html">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/></svg>
+    <span>Saved</span>
+  </a>
+</nav>
+
+<script src="{% static 'js/data.js' %}"></script>
+<script src="{% static 'js/common.js' %}"></script>
+<script src="{% static 'js/title.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const track = (eventType, element) => fetch('{% url "track_activity" %}', {
+    method: 'POST',
+    headers: {...(window.nwCsrfHeaders?.() || {}), 'Content-Type': 'application/json'},
+    body: JSON.stringify({event_type: eventType, movie_id: element.dataset.movieId, movie_title: element.dataset.movieTitle}),
+    keepalive: true
+  }).catch(() => {});
+  document.querySelectorAll('.js-download-link').forEach(link => link.addEventListener('click', () => track('download', link)));
+  const trailer = document.getElementById('trailerFrame');
+  if (trailer) {
+    let recorded = false;
+    new IntersectionObserver(entries => {
+      if (!recorded && entries[0].isIntersecting) {
+        recorded = true;
+        track('trailer_watch', trailer);
+      }
+    }, {threshold: 0.5}).observe(trailer);
+  }
+});
+</script>
+</body>
+</html>
