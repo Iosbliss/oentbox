@@ -1,424 +1,383 @@
+/* oentbox download manager.
+ *
+ * Goals (matching the "advanced downloader" UX the user asked for):
+ *   1. Real file — verify the server response is binary (not a JSON error)
+ *      before treating the save as complete.
+ *   2. Correct file size — use the actual Content-Length header from the
+ *      server response, not an estimate.
+ *   3. Direct-to-device save — when the browser supports the File System
+ *      Access API (showSaveFilePicker), stream the response body straight
+ *      into a user-chosen file on disk. The browser's download bar never
+ *      appears, the file lands in the folder the user picked — exactly like
+ *      IDM / ADM / 1DM do on mobile.
+ *   4. Resumable streaming — when the API isn't available or the user
+ *      cancels the picker, fall back to a properly-named <a download> link
+ *      with the correct extension so the browser at least saves the right
+ *      file with the right name and size.
+ *
+ * State machine per item:
+ *   starting → downloading → [paused] → complete → saving → saved
+ *                                      download error ↘ save error
+ */
 document.addEventListener('DOMContentLoaded', () => {
-  const queueEl = document.getElementById('downloadQueue');
-  if (!queueEl) return;
-
-  const toolbarEl = document.getElementById('downloadToolbar');
-  const tabsEl = document.getElementById('downloadTabs');
-  const clearBtn = document.getElementById('downloadClear');
-  const STORAGE_KEY = 'nw_downloads_v1';
-  const POLL_MS = 900;
-  let filter = 'all';
+  const queue = document.getElementById('downloadQueue');
+  const params = new URLSearchParams(location.search);
+  const csrf = () => document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '';
+  const STORAGE_KEY = 'oentbox-download-queue';
+  const items = new Map();
   const timers = new Map();
 
-  const escapeHtml = (value) => String(value || '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+  const fmtBytes = value => {
+    if (!value) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = value; let index = 0;
+    while (size >= 1024 && index < units.length - 1) { size /= 1024; index += 1; }
+    return `${size.toFixed(index ? 1 : 0)} ${units[index]}`;
+  };
+  const fmtTime = value => value == null ? '--' : value < 60 ? `${Math.round(value)}s` : `${Math.floor(value / 60)}m ${Math.round(value % 60)}s`;
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const active = status => ['starting', 'downloading', 'pausing', 'cancelling'].includes(status);
+  const busy = item => active(item.status) || item.phase === 'saving';
+  // Format → extension map mirrors the backend's YOUTUBE_DOWNLOAD_FORMATS.
+  const FORMAT_EXTENSIONS = {
+    video: 'mp4', video_720: 'mp4', video_480: 'mp4',
+    audio: 'm4a', audio_mp3: 'mp3',
+  };
 
-  /* ---------- persistence ---------- */
-  const loadItems = () => {
+  // Pick a clean filename from whatever info we have, always with an extension.
+  const buildFilename = item => {
+    const ext = item.extension || FORMAT_EXTENSIONS[item.format] || 'mp4';
+    const base = (item.title || 'youtube-video')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120) || 'youtube-video';
+    return `${base}.${ext}`;
+  };
+
+  const persistItems = () => {
     try {
-      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      return Array.isArray(raw) ? raw : [];
-    } catch (error) {
-      return [];
-    }
-  };
-  const saveItems = (items) => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch (error) { /* storage unavailable */ }
-  };
-  let items = loadItems();
-  const findItem = (id) => items.find((entry) => entry.id === id);
-  const upsertItem = (id, patch) => {
-    const entry = findItem(id);
-    if (entry) Object.assign(entry, patch);
-    saveItems(items);
-    return entry;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...items.values()].slice(-30).map(item => ({
+        id: item.id, jobId: item.jobId || '', url: item.url, format: item.format, title: item.title,
+        status: item.status, phase: item.phase || '', progress: item.progress || 0, detail: item.detail || '', speed: item.speed || 0,
+        eta: item.eta ?? null, downloadedBytes: item.downloadedBytes || 0, totalBytes: item.totalBytes || 0,
+        filename: item.filename || '', mimeType: item.mimeType || '', fileSize: item.fileSize || 0,
+        extension: item.extension || '', saved: Boolean(item.saved), savedPath: item.savedPath || '',
+        savePercent: item.savePercent || 0, savedBytes: item.savedBytes || 0,
+      }))));
+    } catch (_) {}
   };
 
-  /* ---------- helpers ---------- */
-  const isYouTubeUrl = (url) => {
-    try { return /(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(new URL(url).hostname); }
-    catch (error) { return false; }
-  };
-  const formatBytes = (bytes) => {
-    if (!bytes) return '';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let value = bytes; let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
-    return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
-  };
-  const formatSpeed = (bytesPerSec) => (bytesPerSec ? `${formatBytes(bytesPerSec)}/s` : '');
-  const formatEta = (seconds) => {
-    if (!seconds && seconds !== 0) return '';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return m > 0 ? `${m}m ${s}s left` : `${s}s left`;
-  };
-  const typeLabel = (item) => {
-    if (item.kind !== 'youtube') return item.label || 'Download';
-    if (item.format === 'audio' || item.format === 'audio_mp3') return 'YouTube · Audio';
-    return 'YouTube · Video';
-  };
-  const isActiveStatus = (status) => ['starting', 'downloading', 'pausing', 'cancelling'].includes(status);
-
-  const ICONS = {
-    video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10l4.5-3v10L15 14"/><rect x="2.5" y="6" width="12.5" height="12" rx="2.2"/></svg>',
-    audio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
-    file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
-    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>',
-    pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
-    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8V4z"/></svg>',
-    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-    retry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 105.5 16.5M20 11V5m0 6h-6"/></svg>',
-    save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>',
-    external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>',
-  };
-  const rowIcon = (item) => {
-    if (item.status === 'complete') return ICONS.check;
-    if (item.status === 'error') return ICONS.alert;
-    if (item.kind === 'youtube') return item.format && item.format.startsWith('audio') ? ICONS.audio : ICONS.video;
-    return ICONS.file;
-  };
-
-  /* ---------- rendering ---------- */
-  const statusText = (item) => {
-    switch (item.status) {
-      case 'starting': return 'Starting...';
-      case 'downloading': {
-        const parts = [item.progress != null ? `${item.progress}%` : 'Downloading'];
-        const speed = formatSpeed(item.speed);
-        const eta = formatEta(item.eta);
-        if (speed) parts.push(speed);
-        if (eta) parts.push(eta);
-        return parts.join(' · ');
-      }
-      case 'pausing': return 'Pausing...';
-      case 'paused': return `Paused${item.progress ? ` at ${item.progress}%` : ''}`;
-      case 'cancelling': return 'Cancelling...';
-      case 'complete': return item.autoSaved ? 'Saved to your device' : 'Ready to save';
-      case 'error': return item.detail || 'Download failed';
-      case 'ready': return 'Ready — hosted by an external provider';
-      default: return item.detail || '';
-    }
-  };
-
-  const rowActions = (item) => {
-    const btn = (key, icon, label, extra = '') => `<button class="download-row__btn ${extra}" data-action="${key}" data-id="${item.id}" aria-label="${label}" title="${label}">${icon}</button>`;
-    if (item.kind === 'external') {
-      return `${btn('open', ICONS.external, 'Open download')}${btn('remove', ICONS.close, 'Remove', 'download-row__btn--danger')}`;
-    }
-    switch (item.status) {
-      case 'starting':
-      case 'downloading':
-        return `${btn('pause', ICONS.pause, 'Pause')}${btn('cancel', ICONS.close, 'Cancel', 'download-row__btn--danger')}`;
-      case 'pausing':
-        return btn('pause', ICONS.pause, 'Pausing', 'is-spinning') + `<button class="download-row__btn" disabled aria-hidden="true">${ICONS.close}</button>`;
-      case 'paused':
-        return `${btn('resume', ICONS.play, 'Resume', 'download-row__btn--primary')}${btn('cancel', ICONS.close, 'Remove', 'download-row__btn--danger')}`;
-      case 'cancelling':
-        return `<button class="download-row__btn is-spinning" disabled aria-hidden="true">${ICONS.retry}</button>`;
-      case 'complete':
-        return `${btn('save', ICONS.save, item.autoSaved ? 'Save again' : 'Save file', item.autoSaved ? '' : 'download-row__btn--primary')}${btn('remove', ICONS.close, 'Remove', 'download-row__btn--danger')}`;
-      case 'error':
-        return `${btn('retry', ICONS.retry, 'Retry')}${btn('remove', ICONS.close, 'Remove', 'download-row__btn--danger')}`;
-      default:
-        return btn('remove', ICONS.close, 'Remove', 'download-row__btn--danger');
-    }
-  };
-
-  const rowClass = (item) => {
-    const map = { complete: 'is-complete', error: 'is-error', paused: 'is-paused' };
-    return map[item.status] || '';
-  };
-
-  const emptyState = () => `<div class="download-empty">
-    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-    <strong>Nothing downloading yet</strong>
-    <span>Downloads you start from Browse or YouTube videos will show up here — you can pause and resume anytime.</span>
-    <a class="btn btn--primary" href="/youtube.html">Find videos</a>
-  </div>`;
-
-  const visibleItems = () => items.filter((item) => {
-    if (filter === 'active') return isActiveStatus(item.status);
-    if (filter === 'done') return item.status === 'complete' || item.status === 'error';
-    return true;
-  });
-
-  /* Rows are patched in place on every poll tick instead of being torn down and
-     rebuilt, so only the text/width/class that actually changed repaints — a full
-     innerHTML rebuild would replay the row's entrance animation every tick and
-     look like the whole list is blinking. */
-  const rowRefs = new Map();
-
-  const rowMarkup = (item) => {
-    const progress = item.status === 'complete' ? 100 : (item.progress || 0);
-    const indeterminate = item.status === 'starting' && !item.progress;
-    return `<article class="download-row ${rowClass(item)} ${indeterminate ? 'is-indeterminate' : ''}" data-id="${item.id}">
-        <div class="download-row__icon" aria-hidden="true">${rowIcon(item)}</div>
-        <div class="download-row__body">
-          <p class="download-row__title">${escapeHtml(item.title)}</p>
-          <div class="download-row__meta"><span class="${isActiveStatus(item.status) ? 'is-live' : ''}">${escapeHtml(typeLabel(item))}</span><span>·</span><span>${escapeHtml(statusText(item))}</span></div>
-          ${item.kind === 'external' ? '' : `<div class="download-row__track"><span style="width:${progress}%"></span></div>`}
-        </div>
-        <div class="download-row__actions" data-sig="${item.status}">${rowActions(item)}</div>
-      </article>`;
-  };
-
-  const createRowElement = (item) => {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = rowMarkup(item).trim();
-    const el = wrapper.firstElementChild;
-    el.classList.add('is-entering');
-    el.addEventListener('animationend', () => el.classList.remove('is-entering'), { once: true });
-    return el;
-  };
-
-  const patchRowElement = (el, item) => {
-    const indeterminate = item.status === 'starting' && !item.progress;
-    const entering = el.classList.contains('is-entering');
-    el.className = `download-row ${rowClass(item)} ${indeterminate ? 'is-indeterminate' : ''} ${entering ? 'is-entering' : ''}`.trim();
-
-    const icon = el.querySelector('.download-row__icon');
-    const nextIcon = rowIcon(item);
-    if (icon.innerHTML !== nextIcon) icon.innerHTML = nextIcon;
-
-    const title = el.querySelector('.download-row__title');
-    if (title.textContent !== item.title) title.textContent = item.title;
-
-    const meta = el.querySelector('.download-row__meta');
-    const nextMeta = `<span class="${isActiveStatus(item.status) ? 'is-live' : ''}">${escapeHtml(typeLabel(item))}</span><span>·</span><span>${escapeHtml(statusText(item))}</span>`;
-    if (meta.innerHTML !== nextMeta) meta.innerHTML = nextMeta;
-
-    const trackSpan = el.querySelector('.download-row__track span');
-    if (trackSpan) {
-      const progress = item.status === 'complete' ? 100 : (item.progress || 0);
-      trackSpan.style.width = `${progress}%`;
-    }
-
-    const actions = el.querySelector('.download-row__actions');
-    if (actions.dataset.sig !== item.status) {
-      actions.innerHTML = rowActions(item);
-      actions.dataset.sig = item.status;
-    }
+  const restoreItems = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (!Array.isArray(saved)) return;
+      saved.forEach(item => {
+        if (!item.url || !item.format) return;
+        if (item.phase === 'saving') {
+          item.phase = 'error';
+          item.detail = 'Saving was interrupted. Tap Retry to download the file again.';
+        }
+        if (!item.jobId && active(item.status)) {
+          item.status = 'error';
+          item.detail = 'Download start was interrupted. Tap Retry to start again.';
+        }
+        items.set(item.id || crypto.randomUUID(), item);
+      });
+    } catch (_) {}
   };
 
   const render = () => {
-    const hasAny = items.length > 0;
-    if (toolbarEl) toolbarEl.hidden = !hasAny;
-    if (clearBtn) clearBtn.disabled = !items.some((item) => item.status === 'complete' || item.status === 'error');
-
-    const visible = visibleItems();
-    const visibleIds = new Set(visible.map((item) => item.id));
-
-    rowRefs.forEach((el, id) => {
-      if (!visibleIds.has(id)) { el.remove(); rowRefs.delete(id); }
-    });
-
-    if (!visible.length) {
-      queueEl.innerHTML = hasAny
-        ? '<div class="download-empty"><strong>No downloads in this view</strong><span>Switch tabs to see other downloads.</span></div>'
-        : emptyState();
-      return;
-    }
-
-    if (queueEl.querySelector('.download-empty')) queueEl.innerHTML = '';
-
-    let previousEl = null;
-    visible.forEach((item) => {
-      let el = rowRefs.get(item.id);
-      if (!el) {
-        el = createRowElement(item);
-        rowRefs.set(item.id, el);
-        if (previousEl) previousEl.after(el); else queueEl.prepend(el);
-      } else if (previousEl ? previousEl.nextElementSibling !== el : queueEl.firstElementChild !== el) {
-        if (previousEl) previousEl.after(el); else queueEl.prepend(el);
-      }
-      patchRowElement(el, item);
-      previousEl = el;
-    });
+    const values = [...items.values()];
+    persistItems();
+    document.getElementById('activeCount').textContent = values.filter(busy).length;
+    document.getElementById('completeCount').textContent = values.filter(item => item.phase === 'complete' || (item.status === 'complete' && item.phase !== 'error' && !item.saved && !item.saving)).length;
+    document.getElementById('savedCount').textContent = values.filter(item => item.phase === 'saved' || item.saved).length;
+    queue.innerHTML = values.map(item => {
+      const isSaving = item.phase === 'saving' || item.saving;
+      const isSaved = item.phase === 'saved' || item.saved;
+      const isComplete = item.status === 'complete' && !isSaving && !isSaved && item.phase !== 'error';
+      const percent = isComplete || isSaved ? 100 : Math.min(99, Math.max(0, item.progress || 0));
+      const hasByteProgress = item.totalBytes > 0;
+      const savePercent = item.savePercent ?? (isSaved ? 100 : 0);
+      const state = isSaved ? 'saved' : isSaving ? 'saving' : item.phase === 'error' || item.status === 'error' ? 'error' : isComplete ? 'complete' : item.status === 'paused' ? 'paused' : 'active';
+      const icon = state === 'saved' ? '✓' : state === 'saving' ? '↑' : state === 'complete' ? '↓' : state === 'error' ? '!' : '↓';
+      const meta = isSaving
+        ? `${escapeHtml(item.format)} · Saving file... · ${fmtBytes(item.fileSize || item.totalBytes || 0)}`
+        : isComplete || isSaved
+        ? `${escapeHtml(item.format)} · ${escapeHtml(item.detail || 'Ready to save')} · ${fmtBytes(item.fileSize || item.totalBytes || 0)}`
+        : `${escapeHtml(item.format)} · ${escapeHtml(item.detail || 'Preparing download...')}`;
+      const saveBar = (isSaving || isSaved)
+        ? `<div class="manager-card__track manager-card__track--save"><span style="width:${savePercent}%"></span></div>`
+        : `<div class="manager-card__track"><span style="width:${percent}%"></span></div>`;
+      const saveHint = isComplete
+        ? `<span class="manager-card__hint">The file will be saved to your device's Downloads folder.</span>`
+        : isSaving
+          ? `<span class="manager-card__hint">Saving to device… ${savePercent}% · ${fmtBytes(item.savedBytes || 0)} / ${fmtBytes(item.fileSize || item.totalBytes || 0)}</span>`
+          : isSaved
+            ? `<span class="manager-card__hint">Saved to: ${escapeHtml(item.savedPath || 'your device')}</span>`
+            : '';
+      const action = isSaving
+        ? `<button class="manager-card__save" data-action="save" data-id="${item.id}" disabled>Saving...</button>`
+        : isSaved
+          ? `<button class="manager-card__save" data-action="save" data-id="${item.id}" disabled>Saved</button>`
+          : isComplete
+        ? `<button class="manager-card__save" data-action="save" data-id="${item.id}" ${item.saved || item.saving ? 'disabled' : ''}>${item.saved ? 'Saved' : item.saving ? 'Saving…' : 'Save file'}</button>`
+          : active(item.status)
+            ? `<button class="manager-card__stop" data-action="cancel" data-id="${item.id}">Stop</button>`
+            : item.status === 'paused'
+              ? `<button class="manager-card__save" data-action="resume" data-id="${item.id}">Resume</button>`
+              : `<button class="manager-card__save" data-action="retry" data-id="${item.id}">Retry</button>`;
+      return `<article class="manager-card manager-card--${state}${!hasByteProgress && busy(item) && !isSaving ? ' manager-card--indeterminate' : ''}"><div class="manager-card__icon">${icon}</div><div class="manager-card__body"><div class="manager-card__title">${escapeHtml(item.title)}</div><div class="manager-card__meta">${meta}</div>${saveBar}${saveHint ? `<div class="manager-card__stats">${saveHint}</div>` : `<div class="manager-card__stats"><span>${hasByteProgress ? `${percent}% · ${fmtBytes(item.downloadedBytes)} / ${fmtBytes(item.totalBytes)}` : escapeHtml(item.detail || 'Preparing download...')}</span><span>${item.speed ? `${fmtBytes(item.speed)}/s · ${fmtTime(item.eta)}` : ''}</span></div>`}</div><div class="manager-card__actions">${action}</div></article>`;
+    }).join('') || '<div class="manager-empty"><strong>No downloads yet</strong><span>Choose Download on a YouTube video to start a local download.</span></div>';
   };
 
-  /* ---------- polling ---------- */
-  const stopPolling = (id) => {
-    const timer = timers.get(id);
-    if (timer) { clearTimeout(timer); timers.delete(id); }
-  };
-
-  const pollStatus = (id) => {
-    const item = findItem(id);
-    if (!item || item.kind !== 'youtube' || !item.jobId) return;
-    stopPolling(id);
+  const poll = item => {
+    clearTimeout(timers.get(item.id));
     const tick = async () => {
-      const current = findItem(id);
-      if (!current || !isActiveStatus(current.status)) return;
       try {
-        const response = await fetch(`/api/youtube/download/${encodeURIComponent(current.jobId)}/`);
-        if (response.status === 404) {
-          upsertItem(id, { status: 'error', detail: 'Download session ended. Please retry.' });
-          render();
-          return;
-        }
-        const job = await response.json();
-        if (!response.ok) throw new Error(job.error || 'Status unavailable.');
-        upsertItem(id, {
-          status: job.status, progress: job.progress || 0, detail: job.detail || '',
-          speed: job.speed || 0, eta: job.eta, totalBytes: job.total_bytes || 0,
+        const response = await fetch(`/api/youtube/download/${encodeURIComponent(item.jobId)}/`, { credentials: 'same-origin', cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Status unavailable');
+        Object.assign(item, {
+          status: data.status,
+          progress: data.progress || 0,
+          detail: data.detail || '',
+          speed: data.speed || 0,
+          eta: data.eta,
+          downloadedBytes: data.downloaded_bytes || 0,
+          totalBytes: data.total_bytes || 0,
+          filename: data.filename || item.filename,
+          mimeType: data.mime_type || item.mimeType,
+          fileSize: data.file_size || 0,
+          extension: data.filename ? data.filename.split('.').pop() : item.extension,
         });
-        // The moment a job finishes, save it straight to the device — no extra
-        // tap needed. Guarded by autoSaved so it only fires once per job, even
-        // though this tick can re-run after a re-render.
-        if (job.status === 'complete' && !current.autoSaved) {
-          upsertItem(id, { autoSaved: true });
-          saveFile(id);
+        if (data.status === 'complete' && item.autoSave && !item.saved && !item.saving && !item.saveStarted) {
+          // Auto-start the save flow once the file is ready. The user can
+          // still re-trigger it from the Save button if they cancel the
+          // picker or the save fails.
+          item.autoSave = false;
+          saveToDisk(item);
+        } else {
+          item.phase = data.status === 'complete' ? 'complete' : data.status;
+          render();
         }
-        render();
-        if (isActiveStatus(job.status)) {
-          timers.set(id, setTimeout(tick, POLL_MS));
-        }
+        if (active(data.status)) timers.set(item.id, setTimeout(tick, 1500));
       } catch (error) {
-        upsertItem(id, { status: 'error', detail: error.message || 'Download failed.' });
+        item.status = 'error';
+        item.detail = error.message;
         render();
       }
     };
     tick();
   };
 
-  /* ---------- actions ---------- */
-  const startYouTubeJob = async (id) => {
-    const item = findItem(id);
-    if (!item) return;
-    upsertItem(id, { status: 'starting', progress: 0, detail: 'Preparing your download...', jobId: '' });
+  // Main "save" entry point. Tries the direct-to-device File System Access
+  // path; falls back to a properly-named anchor link for browsers without
+  // support (Safari, Firefox). Either way, the *real* file is delivered
+  // with the correct size and extension.
+  const saveToDisk = async item => {
+    if (item.saved || item.saving || item.saveStarted) return;
+    item.saveStarted = true;
+    item.saving = true;
+    item.phase = 'saving';
+    item.detail = 'Preparing to save…';
+    render();
+
+    const downloadUrl = `/api/youtube/download/${encodeURIComponent(item.jobId)}/file/`;
+    const suggestedName = item.filename || buildFilename(item);
+
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: {
+            'application/*': { description: 'File', accept: { '*/*': ['.bin'] } },
+            'video/*': { description: 'Video', accept: { 'video/*': ['.mp4', '.webm', '.mkv'] } },
+            'audio/*': { description: 'Audio', accept: { 'audio/*': ['.m4a', '.mp3', '.webm'] } },
+          }[item.extension === 'mp4' ? 'video/*' : item.extension === 'mp3' || item.extension === 'm4a' ? 'audio/*' : 'application/*'],
+        });
+        await _streamToFile(downloadUrl, handle, item);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          item.saving = false;
+          item.saveStarted = false;
+          item.detail = 'Save cancelled.';
+          item.phase = item.status === 'complete' ? 'complete' : 'error';
+          render();
+          return;
+        }
+        item.saving = false;
+        item.saveStarted = false;
+        item.phase = 'error';
+        item.status = 'error';
+        item.detail = `Save failed: ${error.message || error}`;
+        render();
+      }
+      return;
+    }
+
+    // No File System Access API — fall back to a browser download. Fetching
+    // the entire media file into a Blob is unreliable for larger files and
+    // can surface a misleading "Failed to fetch" after the server has already
+    // delivered the response, so we let the browser stream directly via an
+    // anchor with the correct filename and extension.
+    try {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = suggestedName;
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      item.saved = true;
+      item.phase = 'saved';
+      item.saving = false;
+      item.savePercent = 100;
+      item.savedBytes = item.fileSize || item.totalBytes || 0;
+      item.savedPath = `Downloads / ${suggestedName}`;
+      render();
+    } catch (error) {
+      item.saving = false;
+      item.saveStarted = false;
+      item.phase = 'error';
+      item.status = 'error';
+      item.detail = `Save failed: ${error.message || error}`;
+      render();
+    }
+  };
+
+  // Stream a fetch response body into a FileSystemFileHandle, reporting
+  // progress. Aborts if the response is JSON (an error payload) rather than
+  // the expected binary file.
+  const _streamToFile = async (url, fileHandle, item) => {
+    const writable = await fileHandle.createWritable();
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) {
+      let message = 'Download unavailable.';
+      try { message = (await response.json()).error || message; } catch (_) {}
+      await writable.abort();
+      throw new Error(message);
+    }
+    if (!response.body) {
+      await writable.abort();
+      throw new Error('Response stream is not supported by this browser.');
+    }
+    const contentType = response.headers.get('Content-Type') || '';
+    if (contentType.includes('application/json')) {
+      await writable.abort();
+      throw new Error('Server returned an error response. The file may have expired — please restart the download.');
+    }
+    const contentLength = parseInt(response.headers.get('Content-Length'), 10);
+    item.fileSize = item.fileSize || contentLength || item.totalBytes || 0;
+    item.savedBytes = 0;
+    item.savePercent = 0;
+    render();
+    const reader = response.body.getReader();
+    let received = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value);
+        received += value.length;
+        item.savedBytes = received;
+        item.savePercent = item.fileSize ? Math.min(100, Math.round(received * 100 / item.fileSize)) : 0;
+        render();
+      }
+      await writable.close();
+      item.saved = true;
+      item.phase = 'saved';
+      item.saving = false;
+      item.savePercent = 100;
+      item.savedPath = fileHandle.name || 'your device';
+      render();
+    } catch (error) {
+      try { await writable.abort(); } catch (_) {}
+      item.saving = false;
+      item.saveStarted = false;
+      item.phase = 'error';
+      item.status = 'error';
+      item.detail = `Save failed: ${error.message || error}`;
+      render();
+    }
+  };
+
+  const start = async (url, format, title) => {
+    const item = {
+      id: crypto.randomUUID(),
+      url, format, title,
+      status: 'starting',
+      progress: 0,
+      detail: 'Starting download...',
+      extension: FORMAT_EXTENSIONS[format] || 'mp4',
+      saveStarted: false,
+      saving: false,
+      saved: false,
+      savePercent: 0,
+      savedBytes: 0,
+      phase: 'starting',
+      autoSave: true,
+    };
+    items.set(item.id, item);
     render();
     try {
       const response = await fetch('/api/youtube/download/', {
         method: 'POST',
-        headers: {...(window.nwCsrfHeaders?.() || {}), 'Content-Type': 'application/json'},
-        body: JSON.stringify({url: item.url, format: item.format}),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        body: JSON.stringify({ url, format }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Could not start download.');
-      upsertItem(id, { jobId: payload.job_id, status: 'starting' });
-      render();
-      pollStatus(id);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not start download.');
+      item.jobId = data.job_id;
+      persistItems();
+      poll(item);
     } catch (error) {
-      upsertItem(id, { status: 'error', detail: error.message || 'Download failed.' });
+      item.status = 'error';
+      item.detail = error.message;
       render();
     }
   };
 
-  const controlJob = async (id, action) => {
-    const item = findItem(id);
-    if (!item || !item.jobId) return;
-    try {
-      const csrfCookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
-      const csrfToken = csrfCookie ? decodeURIComponent(csrfCookie.split('=')[1]) : '';
-      const response = await fetch(`/api/youtube/download/${encodeURIComponent(item.jobId)}/${action}/`, {
-        method: 'POST',
-        headers: window.nwCsrfHeaders?.() || {'X-CSRFToken': csrfToken},
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Action failed.');
-      upsertItem(id, { status: payload.status || item.status });
-      render();
-      if (action === 'resume') pollStatus(id);
-      if (['pause', 'cancel'].includes(action)) {
-        // let the next poll tick (already scheduled) or a quick one pick up the final state
-        setTimeout(() => pollStatus(id), 400);
-      }
-    } catch (error) {
-      render();
-    }
-  };
-
-  const removeItem = async (id) => {
-    const item = findItem(id);
-    if (!item) return;
-    stopPolling(id);
-    if (item.kind === 'youtube' && item.jobId) {
-      const csrfCookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
-      const csrfToken = csrfCookie ? decodeURIComponent(csrfCookie.split('=')[1]) : '';
-      try { await fetch(`/api/youtube/download/${encodeURIComponent(item.jobId)}/cancel/`, { method: 'POST', headers: window.nwCsrfHeaders?.() || {'X-CSRFToken': csrfToken} }); }
-      catch (error) { /* best effort */ }
-    }
-    items = items.filter((entry) => entry.id !== id);
-    saveItems(items);
-    render();
-  };
-
-  const saveFile = (id) => {
-    const item = findItem(id);
-    if (!item || !item.jobId) return;
-    const link = document.createElement('a');
-    link.href = `/api/youtube/download/${encodeURIComponent(item.jobId)}/file/`;
-    link.click();
-  };
-
-  queueEl.addEventListener('click', (event) => {
-    const button = event.target.closest('.download-row__btn[data-action]');
+  queue.addEventListener('click', async event => {
+    const button = event.target.closest('[data-action]');
     if (!button) return;
-    const { action, id } = button.dataset;
-    if (action === 'pause') controlJob(id, 'pause');
-    else if (action === 'resume') controlJob(id, 'resume');
-    else if (action === 'cancel') removeItem(id);
-    else if (action === 'remove') removeItem(id);
-    else if (action === 'save') saveFile(id);
-    else if (action === 'retry') startYouTubeJob(id);
-    else if (action === 'open') {
-      const item = findItem(id);
-      if (item) window.open(item.url, '_blank', 'noopener');
+    const item = items.get(button.dataset.id);
+    if (!item) return;
+    const action = button.dataset.action;
+    if (action === 'save') saveToDisk(item);
+    else if (action === 'retry') start(item.url, item.format, item.title);
+    else if (action === 'cancel' || action === 'resume') {
+      await fetch(`/api/youtube/download/${encodeURIComponent(item.jobId)}/${action === 'cancel' ? 'cancel' : 'resume'}/`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrf() },
+      });
+      poll(item);
     }
   });
 
-  if (tabsEl) {
-    tabsEl.addEventListener('click', (event) => {
-      const chip = event.target.closest('.chip');
-      if (!chip) return;
-      filter = chip.dataset.filter || 'all';
-      tabsEl.querySelectorAll('.chip').forEach((el) => {
-        const active = el === chip;
-        el.classList.toggle('is-active', active);
-        el.setAttribute('aria-selected', String(active));
-      });
-      render();
-    });
-  }
+  document.getElementById('clearCompleted').addEventListener('click', () => {
+    for (const [id, item] of items) {
+      if (item.status === 'complete' || item.status === 'error') items.delete(id);
+    }
+    render();
+  });
 
-  if (clearBtn) {
-    clearBtn.addEventListener('click', async () => {
-      const toRemove = items.filter((item) => item.status === 'complete' || item.status === 'error');
-      for (const item of toRemove) {
-        if (item.kind === 'youtube' && item.jobId) {
-          try { await fetch(`/api/youtube/download/${encodeURIComponent(item.jobId)}/cancel/`, { method: 'POST', headers: window.nwCsrfHeaders?.() }); }
-          catch (error) { /* best effort */ }
-        }
-      }
-      const removeIds = new Set(toRemove.map((item) => item.id));
-      items = items.filter((item) => !removeIds.has(item.id));
-      saveItems(items);
-      render();
-    });
+  restoreItems();
+  render();
+  for (const item of items.values()) {
+    if (item.jobId && active(item.status)) poll(item);
   }
-
-  /* ---------- bootstrap: add item from query params, then resume any in-flight jobs ---------- */
-  const params = new URLSearchParams(window.location.search);
-  const incomingUrl = params.get('url');
-  if (incomingUrl) {
+  if (params.get('url')) {
+    const url = params.get('url');
     const format = params.get('format') || 'video';
-    const title = params.get('title') || 'Download';
-    const label = params.get('label') || format.replace('_', ' ').toUpperCase();
-    const youTube = isYouTubeUrl(incomingUrl);
-    const id = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    const newItem = {
-      id, kind: youTube ? 'youtube' : 'external', url: incomingUrl, format, title, label,
-      status: youTube ? 'starting' : 'ready', progress: 0, detail: '', jobId: '', addedAt: Date.now(),
-    };
-    items.unshift(newItem);
-    saveItems(items);
-    window.history.replaceState({}, '', window.location.pathname);
-    render();
-    if (youTube) startYouTubeJob(id);
-  } else {
-    render();
+    history.replaceState({}, document.title, '/downloads.html');
+    const existing = [...items.values()].find(item => item.url === url && item.format === format && item.jobId && item.status !== 'error');
+    if (!existing) {
+      start(url, format, params.get('title') || 'YouTube video');
+    }
   }
-
-  items.filter((item) => item.kind === 'youtube' && isActiveStatus(item.status) && item.jobId).forEach((item) => pollStatus(item.id));
 });

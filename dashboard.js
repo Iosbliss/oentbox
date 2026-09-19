@@ -29,48 +29,117 @@ document.addEventListener('DOMContentLoaded', () => {
     ['Latest scrape', latestScrape, 'Last catalog update']
   ];
   const statCards = document.getElementById('statCards');
-  statCards.innerHTML = stats.map(([label, value, delta]) => `<div class="stat"><div class="stat__label">${label}</div><div class="stat__value">${fmt(value)}</div><div class="stat__delta">${delta}</div>${label === 'Latest scrape' ? `<button class="stat__action" id="runScrapeBtn" type="button">Scrape large catalog</button><div class="scrape-progress" id="scrapeProgress" hidden><div class="scrape-progress__text"></div><div class="scrape-progress__track"><div class="scrape-progress__bar"></div></div></div>` : ''}</div>`).join('');
+  statCards.innerHTML = stats.map(([label, value, delta]) => `<div class="stat"><div class="stat__label">${label}</div><div class="stat__value">${fmt(value)}</div><div class="stat__delta">${delta}</div>${label === 'Latest scrape' ? `<button class="stat__action" id="runScrapeBtn" type="button">Scrape large catalog</button><button class="stat__action" id="stopScrapeBtn" type="button" hidden>Stop scraping</button><div class="scrape-progress" id="scrapeProgress" hidden aria-live="polite"><div class="scrape-progress__head"><strong class="scrape-progress__status">Ready to scrape</strong><span class="scrape-progress__percent">0%</span></div><div class="scrape-progress__text">The catalog worker is idle.</div><div class="scrape-progress__track"><div class="scrape-progress__bar"></div></div><div class="scrape-progress__meta"><span class="scrape-progress__count">0 / 0 items</span><span class="scrape-progress__elapsed">00:00</span></div></div>` : ''}</div>`).join('');
   const runScrapeButton = document.getElementById('runScrapeBtn');
+  const stopScrapeButton = document.getElementById('stopScrapeBtn');
   const scrapeProgress = document.getElementById('scrapeProgress');
   const progressText = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__text') : null;
   const progressBar = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__bar') : null;
+  const progressStatus = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__status') : null;
+  const progressPercent = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__percent') : null;
+  const progressCount = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__count') : null;
+  const progressElapsed = scrapeProgress ? scrapeProgress.querySelector('.scrape-progress__elapsed') : null;
   if (runScrapeButton) {
+    let statusTimer;
+    let lastStatus;
+    let statusFailures = 0;
+    const formatElapsed = startedAt => {
+      if (!startedAt) return '00:00';
+      const seconds = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+      return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    };
     const updateScrapeProgress = status => {
       if (!scrapeProgress) return;
-      scrapeProgress.hidden = !status.running;
-      if (status.running) {
-        progressText.textContent = status.message || 'Scraping...';
-        const percentage = status.total ? Math.min(100, Math.round((status.current / status.total) * 100)) : 0;
-        progressBar.style.width = `${percentage}%`;
-        progressBar.classList.toggle('is-indeterminate', !status.total);
+      lastStatus = status;
+      const active = status.running;
+      const terminal = status.status === 'completed' || status.status === 'failed';
+      scrapeProgress.hidden = !active && !terminal;
+      const percentage = status.total ? Math.min(100, Math.round((status.current / status.total) * 100)) : 0;
+      progressStatus.textContent = active ? 'Scraping catalog' : (status.error ? 'Scrape failed' : 'Scrape complete');
+      progressText.textContent = status.message || (active ? 'Working...' : 'The scrape has finished.');
+      progressPercent.textContent = status.total ? `${percentage}%` : 'Live';
+      progressCount.textContent = `${fmt(status.current || 0)} / ${fmt(status.total || 0)} items`;
+      progressElapsed.textContent = formatElapsed(status.started_at);
+      progressBar.style.width = `${percentage}%`;
+      progressBar.classList.toggle('is-indeterminate', active && !status.total);
+      scrapeProgress.classList.toggle('is-complete', !active && !status.error);
+      scrapeProgress.classList.toggle('is-failed', Boolean(status.error));
+      runScrapeButton.disabled = active;
+      runScrapeButton.textContent = active ? 'Scraping...' : (status.error ? 'Try again' : 'Scrape large catalog');
+      if (stopScrapeButton) stopScrapeButton.hidden = !active;
+    };
+    const pollScrapeStatus = async () => {
+      try {
+        const statusResponse = await fetch(statCards.dataset.scrapeStatusUrl, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+        if (!statusResponse.ok || statusResponse.redirected) throw new Error('Status request failed');
+        const status = await statusResponse.json();
+        statusFailures = 0;
+        updateScrapeProgress(status);
+        if (!status.running) {
+          clearInterval(statusTimer);
+        }
+      } catch (error) {
+        statusFailures += 1;
+        if (scrapeProgress) {
+          scrapeProgress.hidden = false;
+          progressStatus.textContent = 'Reconnecting to scraper';
+          progressText.textContent = statusFailures > 2 ? 'Still working. Waiting for the next status update...' : 'Checking scraper status...';
+          progressBar.classList.add('is-indeterminate');
+        }
       }
+    };
+    const startPolling = () => {
+      clearInterval(statusTimer);
+      statusTimer = setInterval(pollScrapeStatus, 2000);
+      pollScrapeStatus();
     };
     runScrapeButton.addEventListener('click', async () => {
       runScrapeButton.disabled = true;
       runScrapeButton.textContent = 'Starting...';
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-        const response = await fetch(statCards.dataset.scrapeUrl, {method: 'POST', headers: {'X-CSRFToken': csrfToken}});
-        if (response.ok || response.status === 409) {
-          runScrapeButton.textContent = response.status === 409 ? 'Already running' : 'Scraping...';
-          const statusTimer = setInterval(async () => {
-            const statusResponse = await fetch(statCards.dataset.scrapeStatusUrl);
-            const status = await statusResponse.json();
-            updateScrapeProgress(status);
-            if (!status.running) {
-              clearInterval(statusTimer);
-              runScrapeButton.disabled = false;
-              runScrapeButton.textContent = status.error ? 'Scrape failed' : 'Scrape complete — refresh';
-            }
-          }, 2000);
-        } else {
-          throw new Error('Scraper request failed');
-        }
+        const response = await fetch(statCards.dataset.scrapeUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'X-CSRFToken': csrfToken},
+        });
+        if (!response.ok && response.status !== 409) throw new Error('Scraper request failed');
+        if (scrapeProgress) scrapeProgress.hidden = false;
+        startPolling();
       } catch (error) {
         runScrapeButton.disabled = false;
         runScrapeButton.textContent = 'Try again';
+        if (scrapeProgress) {
+          scrapeProgress.hidden = false;
+          progressStatus.textContent = 'Could not start scraper';
+          progressText.textContent = 'The worker did not start. Try again.';
+        }
       }
     });
+    stopScrapeButton.addEventListener('click', async () => {
+      stopScrapeButton.disabled = true;
+      stopScrapeButton.textContent = 'Stopping...';
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const response = await fetch(statCards.dataset.scrapeStopUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'X-CSRFToken': csrfToken},
+        });
+        if (!response.ok && response.status !== 409) throw new Error('Stop request failed');
+        await pollScrapeStatus();
+      } catch (error) {
+        stopScrapeButton.disabled = false;
+        stopScrapeButton.textContent = 'Stop scraping';
+      }
+    });
+    startPolling();
+    setInterval(() => {
+      if (lastStatus && lastStatus.running && progressElapsed) progressElapsed.textContent = formatElapsed(lastStatus.started_at);
+    }, 1000);
   }
 
   const rangeToggle = document.getElementById('rangeToggle');
@@ -104,7 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const labels = series.map((point, index) => { if (index % labelEvery !== 0 && index !== series.length - 1) return ''; const date = new Date(`${point.key}T00:00:00`); return `<text x="${points[index][0].toFixed(1)}" y="${height - 6}" text-anchor="middle">${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>`; }).join('');
     const lastPoint = points[points.length - 1];
     lineChart.innerHTML = `${gridLines}${labels}<path class="lc-area" d="${areaPath}"/><path class="lc-line" d="${linePath}"/><circle class="lc-dot" cx="${lastPoint[0].toFixed(1)}" cy="${lastPoint[1].toFixed(1)}" r="4"/>`;
-    lcTotal.textContent = `${fmt(series.reduce((sum, point) => sum + point.value, 0))} ${metric === 'download' ? 'downloads' : 'trailer watches'}`;
+    const metricLabels = { download: 'downloads', trailer_watch: 'trailer watches', youtube_search: 'YouTube searches', youtube_download: 'YouTube downloads' };
+    lcTotal.textContent = `${fmt(series.reduce((sum, point) => sum + point.value, 0))} ${metricLabels[metric] || metric}`;
   }
   renderLineChart(7, currentMetric);
   rangeToggle.addEventListener('click', event => { const button = event.target.closest('button[data-range]'); if (!button) return; rangeToggle.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button)); renderLineChart(Number(button.dataset.range), currentMetric); });

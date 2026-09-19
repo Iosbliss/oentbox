@@ -4,7 +4,7 @@
 //  - /api/* and /admin/*            -> never intercepted, always network
 //  - /static/* (css/js/img/fonts)   -> cache-first, revalidated in the background
 //  - everything else (HTML pages)   -> network-first, falling back to cache when offline
-const CACHE_VERSION = 'oentbox-v4';
+const CACHE_VERSION = 'oentbox-v9';
 
 const APP_SHELL = [
   '/',
@@ -16,10 +16,8 @@ const APP_SHELL = [
   '/static/js/youtube.js',
   '/static/js/title.js',
   '/static/js/data.js',
-  '/static/js/download_manager.js',
   '/static/manifest.json',
-  '/static/img/icon-192.png',
-  '/static/img/icon-512.png',
+  '/static/img/icon-o.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -44,6 +42,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin/')) return;
+
+  // The download queue is user-specific and must always reflect the current
+  // document and its localStorage-backed history, never an old app-shell copy.
+  if (url.pathname === '/downloads.html') {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
 
   if (url.pathname.startsWith('/static/')) {
     event.respondWith(

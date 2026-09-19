@@ -1,0 +1,18 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Downloads | oentbox</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}?v=3">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=9">
+</head>
+<body class="download-manager-page" data-download-page>
+<header class="download-manager__top"><a class="brand" href="/"><span class="brand__mark">O</span><span class="brand__name">oent<em>box</em></span></a><a class="download-manager__back" href="/youtube.html">Back to YouTube</a></header>
+<main class="download-manager__shell">
+  <section class="download-manager__hero"><p class="youtube-kicker">LOCAL DOWNLOADS</p><h1>Your downloads</h1><p>Files are prepared in the background, then saved straight to your device — no browser download bar, just the real file in the folder you choose.</p></section>
+  <section class="download-manager__summary"><div><strong id="activeCount">0</strong><span>Active</span></div><div><strong id="completeCount">0</strong><span>Completed</span></div><div><strong id="savedCount">0</strong><span>Saved locally</span></div><button id="clearCompleted" type="button">Clear completed</button></section>
+  <section id="downloadQueue" class="download-manager__queue" aria-live="polite"></section>
+</main>
+<script src="{% static 'js/download_manager.js' %}?v=18"></script>
+</body></html>

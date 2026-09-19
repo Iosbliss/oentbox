@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_protect
 import json
 import hashlib
 import ipaddress
+import math
 import threading
 import logging
 import os
@@ -19,15 +20,20 @@ import random
 import re
 import tempfile
 import uuid
+from datetime import datetime, timezone as datetime_timezone
+from html import escape
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from functools import lru_cache
+from django.conf import settings
 from django.utils.text import get_valid_filename
 from collections import Counter
 from django.utils import timezone
 from .models import ActivityEvent, DownloadJob, Movie, SavedMovie, ScrapeRun
 from .movie_data import (
+    CATEGORY_LABELS,
+    LEGACY_CATEGORY_ALIASES,
     get_featured_movies,
     get_movies_by_category,
     get_movie_by_id,
@@ -37,10 +43,11 @@ from .movie_data import (
 )
 
 LEGACY_CATEGORY_ALIASES = {
-    "nollywood-movies": "nollywood",
-    "nollywood-series": "tv-series",
-    "hollywood-movies": "hollywood",
-    "hollywood-series": "tv-series",
+    **LEGACY_CATEGORY_ALIASES,
+    "nollywood-movies": "nollywood-movie",
+    "nollywood-series": "nollywood-tv-series",
+    "hollywood-movies": "hollywood-movie",
+    "hollywood-series": "hollywood-tv-series",
 }
 
 SCRAPE_STATE = {
@@ -132,6 +139,49 @@ def service_worker(request):
     return response
 
 
+@require_GET
+def healthz(request):
+    from django.db import connection
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+        return JsonResponse({'status': 'ok', 'database': 'ok'})
+    except Exception as error:
+        logger.exception('Health check failed: %s', error)
+        return JsonResponse({'status': 'error', 'database': 'unavailable'}, status=503)
+
+
+def robots(request):
+    sitemap_url = request.build_absolute_uri('/sitemap.xml')
+    return HttpResponse(f'User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\nSitemap: {sitemap_url}\n', content_type='text/plain')
+
+
+def favicon(request):
+    favicon_path = Path(__file__).resolve().parent.parent / 'static' / 'img' / 'favicon.ico'
+    try:
+        return FileResponse(open(favicon_path, 'rb'), content_type='image/x-icon')
+    except OSError:
+        return HttpResponse(status=404)
+
+
+def sitemap(request):
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    static_paths = ('/', '/about.html', '/browse.html?cat=all', '/youtube.html')
+    movies = Movie.objects.values('id', 'scraped_at').order_by('-scraped_at')[:5000]
+    urls = [(f'{base_url}{path}', '') for path in static_paths]
+    urls.extend(
+        (f'{base_url}/video_detail.html?id={quote(movie["id"])}', movie['scraped_at'].date().isoformat())
+        for movie in movies
+    )
+    body = ''.join(
+        f'<url><loc>{escape(url)}</loc>{f"<lastmod>{lastmod}</lastmod>" if lastmod else ""}</url>'
+        for url, lastmod in urls
+    )
+    return HttpResponse(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</urlset>', content_type='application/xml')
+
+
 def youtube_page(request):
     location_name, queries = _youtube_location_profile(request)
     return render(request, "youtube.html", {
@@ -145,7 +195,7 @@ def youtube_page(request):
 
 def download_manager(request):
     get_token(request)
-    return render(request, "download_manager.html")
+    return render(request, 'download_manager.html')
 
 
 def _format_duration(seconds):
@@ -165,6 +215,43 @@ def _format_number(value):
         if value >= divisor:
             return f'{value / divisor:.1f}{suffix}'.replace('.0', '')
     return str(value)
+
+
+def _relative_publish_time(item):
+    timestamp = item.get('timestamp')
+    if timestamp:
+        published_at = datetime.fromtimestamp(float(timestamp), tz=datetime_timezone.utc)
+    else:
+        upload_date = str(item.get('upload_date') or '')
+        try:
+            published_at = datetime.strptime(upload_date, '%Y%m%d').replace(tzinfo=datetime_timezone.utc)
+        except ValueError:
+            return ''
+
+    elapsed_seconds = max(0, int((timezone.now() - published_at).total_seconds()))
+    units = (
+        ('year', 365 * 24 * 60 * 60),
+        ('month', 30 * 24 * 60 * 60),
+        ('week', 7 * 24 * 60 * 60),
+        ('day', 24 * 60 * 60),
+        ('hour', 60 * 60),
+        ('minute', 60),
+    )
+    for label, seconds in units:
+        if elapsed_seconds >= seconds:
+            count = elapsed_seconds // seconds
+            return f'{count} {label}{"s" if count != 1 else ""} ago'
+    return 'Just now'
+
+
+@lru_cache(maxsize=512)
+def _youtube_publish_time(video_id):
+    import yt_dlp
+
+    options = {'quiet': True, 'no_warnings': True, 'skip_download': True}
+    with yt_dlp.YoutubeDL(options) as downloader:
+        info = downloader.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
+    return _relative_publish_time(info)
 
 
 def _channel_url_from_item(item):
@@ -192,10 +279,92 @@ def _video_summary(item):
         'channel': item.get('channel') or item.get('uploader') or 'YouTube creator',
         'channel_thumbnail': item.get('channel_favicon') or item.get('uploader_favicon') or item.get('channel_thumbnail') or '',
         'duration': item.get('duration_string') or _format_duration(item.get('duration')),
+        'published': _relative_publish_time(item),
         'views': _format_number(item.get('view_count')),
         'likes': _format_number(item.get('like_count')),
         'thumbnail': item.get('thumbnail') or f'https://i.ytimg.com/vi/{video_id}/hqdefault.jpg',
         'url': f'https://www.youtube.com/watch?v={video_id}',
+    }
+
+
+def _youtube_result_score(item, summary, position, query):
+    """Rank results using provider relevance plus local quality signals."""
+    query_terms = set(re.findall(r'\w+', query.lower()))
+    searchable_text = f"{summary['title']} {summary['channel']}".lower()
+    matched_terms = sum(term in searchable_text for term in query_terms)
+    relevance = 1 / (position + 1)
+    personalization = matched_terms / len(query_terms) if query_terms else 0
+
+    views = max(item.get('view_count') or 0, 0)
+    likes = max(item.get('like_count') or 0, 0)
+    engagement = math.log1p(views) + (2 * math.log1p(likes))
+    quality = (
+        math.log1p(item.get('width') or 0)
+        + math.log1p(item.get('height') or 0)
+        + math.log1p(item.get('duration') or 0) / 4
+    )
+    return (
+        (relevance * 100)
+        + (personalization * 35)
+        + (engagement * 2)
+        + quality
+    )
+
+
+def _format_size_label(size):
+    return f'{size / (1024 * 1024):.1f} MB' if size else 'Available after download'
+
+
+def _estimate_download_sizes(formats, duration=0):
+    known = [item for item in formats if item.get('filesize') or item.get('filesize_approx') or ((item.get('tbr') or item.get('abr')) and duration)]
+    audio = [item for item in known if item.get('vcodec') == 'none']
+    video = [item for item in known if item.get('vcodec') != 'none']
+
+    def size(item):
+        known_size = item.get('filesize') or item.get('filesize_approx')
+        if known_size:
+            return known_size
+        bitrate = item.get('tbr') or item.get('abr') or 0
+        return bitrate * 1000 * duration / 8 if bitrate and duration else 0
+
+    def estimate(height=None):
+        matching_video = [item for item in video if not height or (item.get('height') or 0) <= height]
+        if height and matching_video:
+            available_heights = [item.get('height') or 0 for item in matching_video]
+            closest_height = max(available_heights)
+            matching_video = [item for item in matching_video if (item.get('height') or 0) == closest_height]
+        combined = [item for item in matching_video if item.get('acodec') != 'none']
+        if combined:
+            return max(map(size, combined))
+        best_video = max((size(item) for item in matching_video), default=0)
+        best_audio = max((size(item) for item in audio), default=0)
+        if not best_video and height:
+            bitrate = max((item.get('tbr') or item.get('vbr') or 0 for item in matching_video), default=0)
+            best_video = bitrate * 1000 * duration / 8 if bitrate and duration else 0
+        if best_video:
+            return best_video + best_audio
+        if height:
+            overall_video = max((size(item) for item in video), default=0)
+            max_height = max((item.get('height') or 0 for item in video), default=0)
+            scaled_video = overall_video * height / max_height if overall_video and max_height else 0
+            return scaled_video + best_audio
+        return best_audio
+
+    audio_size = max((size(item) for item in audio), default=0)
+    audio_size = audio_size or (128 * 1000 * duration / 8 if duration else 0)
+    mp3_size = 192 * 1000 * duration / 8 if duration else audio_size
+    video_size = estimate()
+    video_720_size = estimate(720)
+    video_480_size = estimate(480)
+    if duration and video_720_size == video_480_size:
+        video_720_size = (2500 * 1000 * duration / 8) + audio_size
+        video_480_size = (1000 * 1000 * duration / 8) + audio_size
+    return {
+        'video': _format_size_label(video_size),
+        'video_720': _format_size_label(video_720_size),
+        'video_480': _format_size_label(video_480_size),
+        'audio': _format_size_label(audio_size),
+        'audio_mp3': _format_size_label(mp3_size),
     }
 
 
@@ -290,7 +459,34 @@ def _youtube_search(query, limit=12):
             continue
         videos.append((item, _video_summary(item)))
 
-    summaries = [video for item, video in videos]
+    summaries = [
+        summary for _, summary, _ in sorted(
+            (
+                (item, summary, position)
+                for position, (item, summary) in enumerate(videos)
+            ),
+            key=lambda result: _youtube_result_score(
+                result[0], result[1], result[2], query,
+            ),
+            reverse=True,
+        )
+    ]
+    publish_candidates = [video for video in summaries if not video['published']][:12]
+
+    def resolve_publish_time(video):
+        try:
+            detail_options = {'quiet': True, 'no_warnings': True, 'skip_download': True}
+            with yt_dlp.YoutubeDL(detail_options) as downloader:
+                info = downloader.extract_info(video['url'], download=False)
+            return video, _relative_publish_time(info)
+        except Exception as error:
+            logger.debug('YouTube publish date lookup failed: %s', error)
+            return video, ''
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        for video, published in executor.map(resolve_publish_time, publish_candidates):
+            video['published'] = published
+
     missing_avatars = [
         video for video in summaries
         if not video['channel_thumbnail'] and (video['channel_url'] or video['channel_id'])
@@ -317,8 +513,22 @@ def _location_profile(country_code):
     return YOUTUBE_LOCATION_PROFILES.get(country_code, ('Trending near you', YOUTUBE_DISCOVERY_QUERIES))
 
 
+def _visitor_ip(request):
+    remote_addr = request.META.get('REMOTE_ADDR', '')
+    if getattr(settings, 'BEHIND_PROXY', False):
+        forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+        if forwarded_for:
+            candidate = forwarded_for.split(',')[0].strip()
+            if candidate:
+                return candidate
+        real_ip = request.META.get('HTTP_X_REAL_IP', '').strip()
+        if real_ip:
+            return real_ip
+    return remote_addr or 'unknown'
+
+
 def _request_location(request):
-    visitor_ip = request.META.get('REMOTE_ADDR', 'unknown')
+    visitor_ip = _visitor_ip(request)
     cache_key = f'youtube-location-v2:{hashlib.sha256(visitor_ip.encode()).hexdigest()[:24]}'
     cached = cache.get(cache_key)
     if cached:
@@ -361,8 +571,6 @@ def _request_location(request):
 def _youtube_location_profile(request):
     _, location = _request_location(request)
     profile_name, queries = _location_profile(location['country_code'])
-    if location['city'] and location['country_code'] in YOUTUBE_LOCATION_PROFILES:
-        profile_name = f"Trending near {location['city']}"
     return profile_name, queries
 
 
@@ -384,10 +592,28 @@ def youtube_search(request):
         videos = list(_youtube_search(resolved_query, limit=limit))
         if not query:
             feed_random.shuffle(videos)
+        ActivityEvent.objects.create(
+            movie_id=resolved_query[:255],
+            movie_title=query[:255] or resolved_query[:255],
+            event_type=ActivityEvent.YOUTUBE_SEARCH,
+        )
         return JsonResponse({'query': query, 'resolved_query': resolved_query, 'videos': videos})
     except Exception as error:
         logger.warning('YouTube search failed: %s', error)
         return JsonResponse({'error': 'YouTube search is temporarily unavailable.'}, status=502)
+
+
+@rate_limit('youtube-publish-date', 60, 60)
+@require_GET
+def youtube_publish_date(request):
+    video_id = request.GET.get('id', '').strip()
+    if not YOUTUBE_ID_RE.match(video_id):
+        return JsonResponse({'error': 'Invalid YouTube video ID.'}, status=400)
+    try:
+        return JsonResponse({'published': _youtube_publish_time(video_id)})
+    except Exception as error:
+        logger.debug('YouTube publish date failed: %s', error)
+        return JsonResponse({'published': ''})
 
 
 CHANNEL_PATH_RE = re.compile(
@@ -452,9 +678,8 @@ def youtube_video_detail(request):
         )
         video['description'] = (info.get('description') or '').strip()
         comments = _video_comments(info)
-        file_sizes = [format_item.get('filesize') or format_item.get('filesize_approx') for format_item in info.get('formats', [])]
-        file_sizes = [size for size in file_sizes if size]
-        video['file_size'] = f'{max(file_sizes) / (1024 * 1024):.1f} MB' if file_sizes else 'Available after download'
+        video['format_sizes'] = _estimate_download_sizes(info.get('formats', []), info.get('duration') or 0)
+        video['file_size'] = video['format_sizes']['video']
         similar = _youtube_search(info.get('channel') or info.get('title') or 'YouTube', limit=6)
         similar = [item for item in similar if item['id'] != video_id]
         for item in similar:
@@ -464,6 +689,17 @@ def youtube_video_detail(request):
             'video': video,
             'comments': comments,
             'similar_videos': similar,
+            'canonical_url': request.build_absolute_uri(f'/youtube/video.html?id={quote(video_id)}'),
+            'seo_json': json.dumps({
+                '@context': 'https://schema.org',
+                '@type': 'VideoObject',
+                'name': video['title'],
+                'description': video['description'][:500] or video['title'],
+                'thumbnailUrl': video['thumbnail'],
+                'uploadDate': info.get('upload_date') or '',
+                'contentUrl': video_url,
+                'embedUrl': f'https://www.youtube.com/embed/{video_id}',
+            }),
         })
     except Exception as error:
         logger.warning('YouTube detail failed: %s', error)
@@ -476,7 +712,11 @@ def _set_download_job(job_id, **updates):
             DOWNLOAD_JOBS[job_id].update(updates)
     persisted_fields = {
         key: value for key, value in updates.items()
-        if key in {'status', 'progress', 'detail', 'filename', 'path', 'output_dir'}
+        if key in {
+            'status', 'progress', 'detail', 'filename', 'path', 'output_dir',
+            'downloaded_bytes', 'total_bytes', 'speed', 'eta',
+            'stop_requested', 'cancel_requested',
+        }
     }
     if persisted_fields:
         DownloadJob.objects.filter(pk=job_id).update(**persisted_fields)
@@ -507,19 +747,52 @@ def _run_youtube_download(job_id):
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
     if not job:
-        return
+        persisted = DownloadJob.objects.filter(pk=job_id).first()
+        if not persisted:
+            return
+        selected_format, extension = YOUTUBE_DOWNLOAD_FORMATS.get(
+            persisted.download_format, YOUTUBE_DOWNLOAD_FORMATS['video'],
+        )
+        job = {
+            'status': persisted.status,
+            'progress': persisted.progress,
+            'detail': persisted.detail,
+            'video_url': persisted.video_url,
+            'download_format': persisted.download_format,
+            'selected_format': selected_format,
+            'extension': extension,
+            'output_dir': persisted.output_dir,
+            'stop_requested': persisted.stop_requested,
+            'cancel_requested': persisted.cancel_requested,
+        }
+        with DOWNLOAD_JOBS_LOCK:
+            DOWNLOAD_JOBS[job_id] = job
     output_dir = Path(job['output_dir'])
     video_url = job['video_url']
     download_format = job['download_format']
     selected_format = job['selected_format']
     extension = job['extension']
     output_template = str(output_dir / '%(title).120s.%(ext)s')
+    initial_state = DownloadJob.objects.filter(pk=job_id).values(
+        'stop_requested', 'cancel_requested',
+    ).first()
+    if initial_state and initial_state['cancel_requested']:
+        _cleanup_download_dir(output_dir)
+        _set_download_job(job_id, status='error', detail='Download cancelled.')
+        return
+    if initial_state and initial_state['stop_requested']:
+        _set_download_job(job_id, status='paused', detail='Paused')
+        return
     _set_download_job(job_id, status='downloading', detail='Downloading...', stop_requested=False)
 
     def progress_hook(data):
         with DOWNLOAD_JOBS_LOCK:
             current = DOWNLOAD_JOBS.get(job_id)
             stop_requested = bool(current and current.get('stop_requested'))
+        persisted = DownloadJob.objects.filter(pk=job_id).values(
+            'stop_requested', 'cancel_requested',
+        ).first()
+        stop_requested = stop_requested or bool(persisted and persisted['stop_requested'])
         if stop_requested:
             raise _DownloadPaused()
         if data.get('status') == 'downloading':
@@ -540,6 +813,14 @@ def _run_youtube_download(job_id):
             'quiet': True,
             'no_warnings': True,
             'format': selected_format,
+            'noplaylist': True,
+            'retries': 3,
+            'fragment_retries': 3,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web_safari', 'tv'],
+                },
+            },
             'progress_hooks': [progress_hook],
             'postprocessors': ([{
                 'key': 'FFmpegExtractAudio',
@@ -547,11 +828,11 @@ def _run_youtube_download(job_id):
                 'preferredquality': '192',
             }] if download_format == 'audio_mp3' else []),
             'outtmpl': output_template,
-            'noplaylist': True,
             'continuedl': True,
             'nopart': False,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web_safari', 'tv']}},
         }
+        if download_format.startswith('video'):
+            options['merge_output_format'] = 'mp4'
         with yt_dlp.YoutubeDL(options) as downloader:
             info = downloader.extract_info(video_url, download=True)
         files = [file for file in output_dir.iterdir() if file.is_file() and not file.name.endswith('.part')]
@@ -561,12 +842,20 @@ def _run_youtube_download(job_id):
         filename = f'{filename[:120]}.{extension}'
         _set_download_job(job_id, status='complete', progress=100, detail='Download ready.',
                            path=str(files[0]), filename=filename)
+        ActivityEvent.objects.create(
+            movie_id=video_url,
+            movie_title=info.get('title') or 'YouTube video',
+            event_type=ActivityEvent.YOUTUBE_DOWNLOAD,
+        )
     except _DownloadPaused:
+        persisted = DownloadJob.objects.filter(pk=job_id).values('cancel_requested').first()
         with DOWNLOAD_JOBS_LOCK:
             current = DOWNLOAD_JOBS.get(job_id)
-            cancelled = bool(current and current.get('cancel_requested'))
+            cancelled = bool(current and current.get('cancel_requested')) or bool(persisted and persisted['cancel_requested'])
         if cancelled:
             _cleanup_download_dir(output_dir)
+            _set_download_job(job_id, status='error', progress=0, detail='Download cancelled.',
+                               stop_requested=False, cancel_requested=False)
             with DOWNLOAD_JOBS_LOCK:
                 DOWNLOAD_JOBS.pop(job_id, None)
         else:
@@ -581,7 +870,9 @@ def _run_youtube_download(job_id):
             with DOWNLOAD_JOBS_LOCK:
                 DOWNLOAD_JOBS.pop(job_id, None)
         else:
-            _set_download_job(job_id, status='error', progress=0, detail='This video could not be downloaded.')
+            unavailable = 'not available' in str(error).lower() or 'unavailable' in str(error).lower()
+            detail = 'This YouTube video is unavailable.' if unavailable else 'Download failed. Please try again.'
+            _set_download_job(job_id, status='error', progress=0, detail=detail)
 
 
 def _cleanup_download_dir(output_dir):
@@ -593,11 +884,30 @@ def _cleanup_download_dir(output_dir):
         pass
 
 
+def _spawn_download_job(job_id):
+    import subprocess
+    import sys
+
+    if os.environ.get('QUEUE_BACKEND', '').lower() == 'celery':
+        from .tasks import run_download_job_task
+        run_download_job_task.delay(job_id)
+        return None
+
+    return subprocess.Popen(
+        [sys.executable, str(Path(__file__).resolve().parent.parent / 'manage.py'),
+         'run_download_job', '--job-id', job_id],
+        cwd=str(Path(__file__).resolve().parent.parent),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+    )
+
+
 YOUTUBE_DOWNLOAD_FORMATS = {
-    'video': ('best[ext=mp4]/best', 'mp4'),
-    'video_720': ('bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best', 'mp4'),
-    'video_480': ('bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best', 'mp4'),
-    'audio': ('bestaudio[ext=m4a]/bestaudio', 'm4a'),
+    'video': ('bestvideo*+bestaudio/bestvideo*/best', 'mp4'),
+    'video_720': ('bestvideo*[height<=720]+bestaudio/best[height<=720]/best', 'mp4'),
+    'video_480': ('bestvideo*[height<=480]+bestaudio/best[height<=480]/best', 'mp4'),
+    'audio': ('bestaudio/best', 'm4a'),
     'audio_mp3': ('bestaudio/best', 'mp3'),
 }
 
@@ -608,39 +918,124 @@ YOUTUBE_DOWNLOAD_FORMATS = {
 def youtube_download(request):
     try:
         payload = json.loads(request.body or '{}')
+        video_url = str(payload.get('url', '')).strip()
+        download_format = str(payload.get('format', 'video')).strip().lower()
+        parsed = urlparse(video_url)
+        if parsed.scheme not in {'http', 'https'} or (parsed.hostname or '').lower() not in YOUTUBE_HOSTS:
+            return JsonResponse({'error': 'Only YouTube video URLs are supported.'}, status=400)
+        if download_format not in YOUTUBE_DOWNLOAD_FORMATS:
+            return JsonResponse({'error': 'Unsupported download format.'}, status=400)
+        selected_format, extension = YOUTUBE_DOWNLOAD_FORMATS[download_format]
+
+        job_id = uuid.uuid4().hex
+        output_dir = Path(tempfile.mkdtemp(prefix='oentbox-youtube-'))
+        session_key = '' if request.user.is_authenticated else _ensure_download_session(request)
+        DownloadJob.objects.create(
+            id=job_id,
+            user=request.user if request.user.is_authenticated else None,
+            session_key=session_key,
+            video_url=video_url,
+            download_format=download_format,
+            status='starting',
+            detail='Preparing download...',
+            output_dir=str(output_dir),
+        )
+        with DOWNLOAD_JOBS_LOCK:
+            DOWNLOAD_JOBS[job_id] = {
+                'status': 'starting', 'progress': 0, 'detail': 'Preparing download...',
+                'video_url': video_url, 'download_format': download_format,
+                'selected_format': selected_format, 'extension': extension,
+                'output_dir': str(output_dir), 'stop_requested': False, 'cancel_requested': False,
+            }
+        try:
+            _spawn_download_job(job_id)
+        except Exception:
+            DownloadJob.objects.filter(pk=job_id).update(
+                status='error', detail='The download worker could not start.',
+            )
+            _cleanup_download_dir(output_dir)
+            raise
+        return JsonResponse({'job_id': job_id})
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON.'}, status=400)
-    video_url = str(payload.get('url', '')).strip()
-    download_format = str(payload.get('format', 'video')).strip().lower()
+    except Exception:
+        logger.exception('Could not create YouTube download job')
+        return JsonResponse({'error': 'Could not start the download. Please try again.'}, status=503)
+
+
+@require_GET
+def youtube_download_direct(request):
+    """Download a YouTube file directly through the browser response."""
+    video_url = request.GET.get('url', '').strip()
+    download_format = request.GET.get('format', 'video').strip().lower()
     parsed = urlparse(video_url)
     if parsed.scheme not in {'http', 'https'} or (parsed.hostname or '').lower() not in YOUTUBE_HOSTS:
         return JsonResponse({'error': 'Only YouTube video URLs are supported.'}, status=400)
     if download_format not in YOUTUBE_DOWNLOAD_FORMATS:
         return JsonResponse({'error': 'Unsupported download format.'}, status=400)
-    selected_format, extension = YOUTUBE_DOWNLOAD_FORMATS[download_format]
 
-    job_id = uuid.uuid4().hex
-    output_dir = Path(tempfile.mkdtemp(prefix='oentbox-youtube-'))
-    session_key = '' if request.user.is_authenticated else _ensure_download_session(request)
-    DownloadJob.objects.create(
-        id=job_id,
-        user=request.user if request.user.is_authenticated else None,
-        session_key=session_key,
-        video_url=video_url,
-        download_format=download_format,
-        status='starting',
-        detail='Preparing download...',
-        output_dir=str(output_dir),
-    )
-    with DOWNLOAD_JOBS_LOCK:
-        DOWNLOAD_JOBS[job_id] = {
-            'status': 'starting', 'progress': 0, 'detail': 'Preparing download...',
-            'video_url': video_url, 'download_format': download_format,
-            'selected_format': selected_format, 'extension': extension,
-            'output_dir': str(output_dir), 'stop_requested': False, 'cancel_requested': False,
+    selected_format, extension = YOUTUBE_DOWNLOAD_FORMATS[download_format]
+    output_dir = Path(tempfile.mkdtemp(prefix='oentbox-direct-'))
+    output_template = str(output_dir / '%(title).120s.%(ext)s')
+    try:
+        import yt_dlp
+
+        options = {
+            'quiet': True,
+            'no_warnings': True,
+            'format': selected_format,
+            'noplaylist': True,
+            'retries': 3,
+            'fragment_retries': 3,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web_safari', 'tv']}},
+            'outtmpl': output_template,
+            'continuedl': True,
+            'nopart': False,
         }
-    threading.Thread(target=_run_youtube_download, args=(job_id,), daemon=True).start()
-    return JsonResponse({'job_id': job_id})
+        if download_format.startswith('video'):
+            options['merge_output_format'] = 'mp4'
+        if download_format == 'audio_mp3':
+            options['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
+        with yt_dlp.YoutubeDL(options) as downloader:
+            info = downloader.extract_info(video_url, download=True)
+        files = [file for file in output_dir.iterdir() if file.is_file() and not file.name.endswith('.part')]
+        if not files:
+            raise RuntimeError('No downloaded file was produced.')
+        filename = get_valid_filename(info.get('title') or 'youtube-video')
+        filename = f'{filename[:120]}.{extension}'
+        response = FileResponse(open(files[0], 'rb'), as_attachment=True, filename=filename)
+        response['X-Content-Type-Options'] = 'nosniff'
+        response._resource_closers.append(lambda: _cleanup_download_dir(output_dir))
+        ActivityEvent.objects.create(
+            movie_id=video_url,
+            movie_title=info.get('title') or 'YouTube video',
+            event_type=ActivityEvent.YOUTUBE_DOWNLOAD,
+        )
+        return response
+    except Exception as error:
+        _cleanup_download_dir(output_dir)
+        logger.warning('Direct YouTube download failed: %s', error)
+        return JsonResponse({'error': 'The video could not be downloaded. Please try again.'}, status=502)
+
+
+DOWNLOAD_MIME_TYPES = {
+    'mp4': 'video/mp4',
+    'm4a': 'audio/mp4',
+    'mp3': 'audio/mpeg',
+    'webm': 'video/webm',
+    'mkv': 'video/x-matroska',
+}
+
+
+def _mime_for_filename(filename):
+    if not filename:
+        return 'application/octet-stream'
+    suffix = Path(filename).suffix.lstrip('.').lower()
+    return DOWNLOAD_MIME_TYPES.get(suffix, 'application/octet-stream')
 
 
 @require_GET
@@ -648,34 +1043,47 @@ def youtube_download_status(request, job_id):
     persisted = _owned_download_job(request, job_id)
     if not persisted:
         return JsonResponse({'error': 'Download job not found.'}, status=404)
-    with DOWNLOAD_JOBS_LOCK:
-        job = DOWNLOAD_JOBS.get(job_id)
-    if not job:
-        job = {
-            'status': persisted.status,
-            'progress': persisted.progress,
-            'detail': persisted.detail,
-            'filename': persisted.filename,
-        }
-    hidden = {'path', 'filename', 'output_dir', 'video_url', 'selected_format', 'stop_requested', 'cancel_requested'}
-    return JsonResponse({key: value for key, value in job.items() if key not in hidden})
+    if persisted.status == 'starting' and (timezone.now() - persisted.updated_at).total_seconds() > 120:
+        persisted.status = 'error'
+        persisted.detail = 'The download worker did not start. Please retry.'
+        persisted.save(update_fields=('status', 'detail', 'updated_at'))
+    file_size = persisted.total_bytes if persisted.status == 'complete' else 0
+    if persisted.status == 'complete' and persisted.path:
+        try:
+            file_size = Path(persisted.path).stat().st_size
+        except OSError:
+            file_size = 0
+    return JsonResponse({
+        'status': persisted.status,
+        'progress': persisted.progress,
+        'detail': persisted.detail,
+        'downloaded_bytes': persisted.downloaded_bytes,
+        'total_bytes': persisted.total_bytes,
+        'speed': persisted.speed,
+        'eta': persisted.eta,
+        'filename': persisted.filename,
+        'mime_type': _mime_for_filename(persisted.filename),
+        'file_size': file_size,
+    })
 
 
 @rate_limit('download-control', 30, 60)
 @csrf_protect
 @require_POST
 def youtube_download_pause(request, job_id):
-    if not _owned_download_job(request, job_id):
+    persisted = _owned_download_job(request, job_id)
+    if not persisted:
         return JsonResponse({'error': 'Download job not found.'}, status=404)
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
-        if not job:
-            return JsonResponse({'error': 'Download job not found.'}, status=404)
-        if job.get('status') not in {'starting', 'downloading'}:
+        current_status = persisted.status
+        if current_status not in {'starting', 'downloading'}:
             return JsonResponse({'error': 'Download cannot be paused right now.'}, status=409)
-        job['stop_requested'] = True
-        job['status'] = 'pausing'
-        job['detail'] = 'Pausing...'
+        if job:
+            job['stop_requested'] = True
+            job['status'] = 'pausing'
+            job['detail'] = 'Pausing...'
+    _set_download_job(job_id, stop_requested=True, status='pausing', detail='Pausing...')
     return JsonResponse({'status': 'pausing'})
 
 
@@ -683,18 +1091,24 @@ def youtube_download_pause(request, job_id):
 @csrf_protect
 @require_POST
 def youtube_download_resume(request, job_id):
-    if not _owned_download_job(request, job_id):
+    persisted = _owned_download_job(request, job_id)
+    if not persisted:
         return JsonResponse({'error': 'Download job not found.'}, status=404)
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
-        if not job:
-            return JsonResponse({'error': 'Download job not found.'}, status=404)
-        if job.get('status') != 'paused':
+        current_status = persisted.status
+        if current_status != 'paused':
             return JsonResponse({'error': 'Download is not paused.'}, status=409)
-        job['status'] = 'starting'
-        job['stop_requested'] = False
-        job['detail'] = 'Resuming...'
-    threading.Thread(target=_run_youtube_download, args=(job_id,), daemon=True).start()
+        if job:
+            job['status'] = 'starting'
+            job['stop_requested'] = False
+            job['detail'] = 'Resuming...'
+    _set_download_job(job_id, status='starting', stop_requested=False, cancel_requested=False, detail='Resuming...')
+    try:
+        _spawn_download_job(job_id)
+    except OSError:
+        _set_download_job(job_id, status='paused', detail='Resume could not be started.')
+        return JsonResponse({'error': 'Resume could not be started.'}, status=503)
     return JsonResponse({'status': 'starting'})
 
 
@@ -702,22 +1116,27 @@ def youtube_download_resume(request, job_id):
 @csrf_protect
 @require_POST
 def youtube_download_cancel(request, job_id):
-    if not _owned_download_job(request, job_id):
+    persisted = _owned_download_job(request, job_id)
+    if not persisted:
         return JsonResponse({'error': 'Download job not found.'}, status=404)
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
-        if not job:
-            return JsonResponse({'error': 'Download job not found.'}, status=404)
-        active = job.get('status') in {'starting', 'downloading', 'pausing'}
+        active = (job and job.get('status') in {'starting', 'downloading', 'pausing'}) or persisted.status in {'starting', 'downloading', 'pausing', 'cancelling'}
         if active:
-            job['cancel_requested'] = True
-            job['stop_requested'] = True
-            job['status'] = 'cancelling'
-            job['detail'] = 'Cancelling...'
-            return JsonResponse({'status': 'cancelling'})
-        output_dir = job.get('output_dir')
-        path = job.get('path')
-        DOWNLOAD_JOBS.pop(job_id, None)
+            if job:
+                job['cancel_requested'] = True
+                job['stop_requested'] = True
+                job['status'] = 'cancelling'
+                job['detail'] = 'Cancelling...'
+            active_cancel = True
+        else:
+            active_cancel = False
+            output_dir = job.get('output_dir') if job else persisted.output_dir
+            path = job.get('path') if job else persisted.path
+            DOWNLOAD_JOBS.pop(job_id, None)
+    if active_cancel:
+        _set_download_job(job_id, cancel_requested=True, stop_requested=True, status='cancelling', detail='Cancelling...')
+        return JsonResponse({'status': 'cancelling'})
     if path:
         Path(path).unlink(missing_ok=True)
     if output_dir:
@@ -727,22 +1146,78 @@ def youtube_download_cancel(request, job_id):
 
 @require_GET
 def youtube_download_file(request, job_id):
+    """Stream the downloaded file to the client.
+
+    Improvements over the previous version:
+      * Validates the file still exists on disk before opening it.
+      * Sends ``Content-Length`` so the browser/UI shows the *actual* file size.
+      * Sends ``Accept-Ranges: bytes`` and honors ``Range`` requests so the
+        file can be resumed if the connection drops mid-download — exactly
+        what "advanced downloaders" need.
+      * Sets the proper ``Content-Type`` per extension (video/mp4, audio/mpeg,
+        ...) instead of relying on the browser's sniffing.
+      * Does NOT delete the file when the response finishes — the existing
+        ``cleanup_downloads`` management command (TTL based) handles that, so
+        a user can retry / re-save a file without getting a 404 JSON blob.
+    """
     persisted = _owned_download_job(request, job_id)
     if not persisted:
         return JsonResponse({'error': 'Download job not found.'}, status=404)
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
-    if not job and persisted.status == 'complete':
-        job = {'status': persisted.status, 'path': persisted.path, 'filename': persisted.filename}
+    if persisted.status == 'complete':
+        job = {
+            'status': 'complete',
+            'path': persisted.path or (job.get('path') if job else ''),
+            'filename': persisted.filename or (job.get('filename') if job else ''),
+        }
     if not job or job.get('status') != 'complete' or not job.get('path'):
         return JsonResponse({'error': 'Download is not ready.'}, status=409)
-    response = FileResponse(open(job['path'], 'rb'), as_attachment=True, filename=job['filename'])
+
+    file_path = Path(job['path'])
+    if not file_path.exists() or not file_path.is_file():
+        # File was already cleaned up by the TTL command. Mark the job so the
+        # UI can show an actionable error and let the user retry from scratch.
+        _set_download_job(job_id, status='error', detail='File expired. Please restart the download.')
+        return JsonResponse({'error': 'File expired. Please restart the download.'}, status=410)
+
+    file_size = file_path.stat().st_size
+    filename = job.get('filename') or persisted.filename or file_path.name
+    content_type = _mime_for_filename(filename)
+
+    # --- Range request handling -------------------------------------------------
+    range_header = request.META.get('HTTP_RANGE')
+    start = 0
+    end = file_size - 1
+    partial = False
+    if range_header and 'bytes=' in range_header:
+        try:
+            range_spec = range_header.split('bytes=', 1)[1].split('-', 1)
+            start = int(range_spec[0]) if range_spec[0] else 0
+            end = int(range_spec[1]) if range_spec[1] else file_size - 1
+            if start > end or start >= file_size:
+                response = HttpResponse(status=416)
+                response['Content-Range'] = f'bytes */{file_size}'
+                return response
+            end = min(end, file_size - 1)
+            partial = True
+        except (ValueError, IndexError):
+            start, end, partial = 0, file_size - 1, False
+
+    content_length = end - start + 1
+    file_handle = open(file_path, 'rb')
+    if start:
+        file_handle.seek(start)
+
+    response = FileResponse(file_handle, content_type=content_type)
+    response['Content-Length'] = str(content_length)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Accept-Ranges'] = 'bytes'
     response['X-Content-Type-Options'] = 'nosniff'
-    def cleanup_download():
-        Path(job['path']).unlink(missing_ok=True)
-        with DOWNLOAD_JOBS_LOCK:
-            DOWNLOAD_JOBS.pop(job_id, None)
-    response._resource_closers.append(cleanup_download)
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    if partial:
+        response.status_code = 206
+        response['Content-Range'] = f'bytes {start}-{end}/{file_size}'
     return response
 
 
@@ -751,22 +1226,27 @@ def home(request):
     featured_movies = get_featured_movies(limit=12)
     
     # Get movies by category for different sections
-    nollywood = get_movies_by_category('nollywood', limit=8)
-    korean_drama = get_movies_by_category('korean-drama', limit=8)
-    hollywood = get_movies_by_category('hollywood', limit=8)
-    tv_series = get_movies_by_category('tv-series', limit=8)
-    anime = get_movies_by_category('anime', limit=8)
+    home_row_limit = 16
+    nollywood = get_movies_by_category('nollywood-movie', limit=home_row_limit)
+    korean_drama = get_movies_by_category('korean-drama', limit=home_row_limit)
+    hollywood = get_movies_by_category('hollywood-movie', limit=home_row_limit)
+    tv_series = get_movies_by_category('hollywood-tv-series', limit=home_row_limit)
+    anime = get_movies_by_category('anime', limit=home_row_limit)
     additional_categories = [
+        ('Nollywood Series', 'nollywood-tv-series'),
+        ('Foreign Movies', 'foreign-movie'),
+        ('Other Foreign Series', 'other-foreign-series'),
         ('Chinese Drama', 'chinese-drama'),
         ('Japanese Drama', 'japanese-drama'),
         ('Filipino Drama', 'filipino-drama'),
         ('Turkish Drama', 'turkish-drama'),
+        ('Thai Drama', 'thai-drama'),
     ]
     additional_category_sections = [
         {
             'label': label,
             'slug': slug,
-            'movies': get_movies_by_category(slug, limit=8),
+            'movies': get_movies_by_category(slug, limit=home_row_limit),
         }
         for label, slug in additional_categories
     ]
@@ -870,19 +1350,58 @@ def run_scraper(request):
         SCRAPE_STATE['total'] = 0
 
     started_count = len(load_movies())
-    scrape_run = ScrapeRun.objects.create(status='running', total_titles=started_count)
+    try:
+        scrape_run = ScrapeRun.objects.create(status='running', total_titles=started_count)
+    except Exception:
+        with SCRAPE_LOCK:
+            SCRAPE_STATE['running'] = False
+        return JsonResponse({'started': False, 'running': True}, status=409)
 
     import subprocess
     import sys
-    subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve().parent.parent / 'manage.py'),
-         'run_scrape_job', '--run-id', str(scrape_run.pk)],
-        cwd=str(Path(__file__).resolve().parent.parent),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        close_fds=True,
-    )
-    return JsonResponse({'started': True, 'running': True}, status=202)
+    log_path = Path(tempfile.gettempdir()) / f'oentbox-scrape-{scrape_run.pk}.log'
+    try:
+        with log_path.open('ab') as log_handle:
+            worker = subprocess.Popen(
+                [sys.executable, str(Path(__file__).resolve().parent.parent / 'manage.py'),
+                 'run_scrape_job', '--run-id', str(scrape_run.pk)],
+                cwd=str(Path(__file__).resolve().parent.parent),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                close_fds=True,
+                start_new_session=True,
+            )
+            ScrapeRun.objects.filter(pk=scrape_run.pk).update(process_id=worker.pid)
+    except OSError as error:
+        ScrapeRun.objects.filter(pk=scrape_run.pk).update(
+            status='failed', error=str(error), progress_message='Worker could not start',
+            finished_at=timezone.now(),
+        )
+        return JsonResponse({'started': False, 'running': False, 'error': str(error)}, status=503)
+    return JsonResponse({'started': True, 'running': True, 'run_id': scrape_run.pk}, status=202)
+
+
+@staff_member_required(login_url="/admin/login/")
+@require_POST
+def stop_scraper(request):
+    """Stop the active scraper worker and mark its run as cancelled."""
+    run = ScrapeRun.objects.filter(status='running').first()
+    if not run:
+        return JsonResponse({'stopped': False, 'running': False}, status=409)
+    if run.process_id:
+        try:
+            os.kill(run.process_id, 15)
+        except ProcessLookupError:
+            pass
+        except OSError as error:
+            logger.warning('Could not stop scraper process %s: %s', run.process_id, error)
+    run.status = 'cancelled'
+    run.progress_message = 'Scrape stopped'
+    run.finished_at = timezone.now()
+    run.save(update_fields=['status', 'progress_message', 'finished_at'])
+    with SCRAPE_LOCK:
+        SCRAPE_STATE.update(running=False, message='Scrape stopped')
+    return JsonResponse({'stopped': True, 'running': False})
 
 
 @staff_member_required(login_url="/admin/login/")
@@ -890,15 +1409,24 @@ def scraper_status(request):
     """Return the current background scraper state for the dashboard."""
     with SCRAPE_LOCK:
         state = dict(SCRAPE_STATE)
-    latest = ScrapeRun.objects.first()
-    if latest:
-        state.update({
-            'running': latest.status == 'running',
-            'message': latest.status.title(),
-            'error': latest.error,
-            'current': latest.total_titles,
-            'total': latest.total_titles,
-        })
+    try:
+        latest = ScrapeRun.objects.filter(status='running').first() or ScrapeRun.objects.first()
+        if latest:
+            state.update({
+                'run_id': latest.pk,
+                'status': latest.status,
+                'running': latest.status == 'running',
+                'message': latest.progress_message or latest.status.title(),
+                'error': latest.error,
+                'current': latest.progress_current,
+                'total': latest.progress_total,
+                'new_titles': latest.new_titles,
+                'started_at': latest.started_at.isoformat(),
+                'finished_at': latest.finished_at.isoformat() if latest.finished_at else None,
+                'process_id': latest.process_id,
+            })
+    except Exception:
+        logger.exception('Unable to read scraper status')
     return JsonResponse(state)
 
 
@@ -913,7 +1441,10 @@ def track_activity(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     event_type = payload.get('event_type')
-    if event_type not in {ActivityEvent.DOWNLOAD, ActivityEvent.TRAILER_WATCH}:
+    if event_type not in {
+        ActivityEvent.DOWNLOAD, ActivityEvent.TRAILER_WATCH,
+        ActivityEvent.YOUTUBE_SEARCH, ActivityEvent.YOUTUBE_DOWNLOAD,
+    }:
         return JsonResponse({'error': 'Unsupported event type'}, status=400)
     movie_id = str(payload.get('movie_id', '')).strip()
     movie_title = str(payload.get('movie_title', '')).strip()
@@ -938,13 +1469,21 @@ def about(request):
     return render(request, "about.html", context)
 
 
+def privacy(request):
+    return render(request, 'privacy.html')
+
+
+def terms(request):
+    return render(request, 'terms.html')
+
+
 def browse(request):
     """Browse movies by category"""
     category = resolve_category_slug(request.GET.get('cat', 'all'))
     search_query = request.GET.get('q', '').strip()[:100]
     year = request.GET.get('year', '').strip()
     media_type = request.GET.get('type', '').strip().lower()
-    sort = request.GET.get('sort', 'newest').strip().lower()
+    sort = request.GET.get('sort', 'title').strip().lower()
     
     categories = get_categories()
     
@@ -972,7 +1511,7 @@ def browse(request):
         if not search_query and category == 'all':
             page_title = 'All Movies'
         queryset = queryset.values()
-        paginator = Paginator(queryset, 24)
+        paginator = Paginator(queryset, 52)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
         movies = list(page_obj.object_list)
@@ -984,20 +1523,20 @@ def browse(request):
     elif search_query:
         movies = search_movies(search_query, limit=24)
         page_title = f'Search: {search_query}'
-        paginator = Paginator(movies, 24)
+        paginator = Paginator(movies, 52)
         page_obj = paginator.get_page(request.GET.get('page', 1))
         movies = page_obj.object_list
         total_movies = paginator.count
     elif category == 'all':
         movies = load_movies()
-        paginator = Paginator(movies, 24)
+        paginator = Paginator(movies, 52)
         page_obj = paginator.get_page(request.GET.get('page', 1))
         movies = page_obj.object_list
         total_movies = paginator.count
         page_title = 'All Movies'
     else:
         movies = get_movies_by_category(category)
-        paginator = Paginator(movies, 24)
+        paginator = Paginator(movies, 52)
         page_obj = paginator.get_page(request.GET.get('page', 1))
         movies = page_obj.object_list
         total_movies = paginator.count
@@ -1117,7 +1656,16 @@ def title_detail(request):
             context = {
                 'movie': movie,
                 'related_movies': related,
-                'has_movie': True
+                'has_movie': True,
+                'canonical_url': request.build_absolute_uri(f'/video_detail.html?id={quote(movie_id)}'),
+                'seo_json': json.dumps({
+                    '@context': 'https://schema.org',
+                    '@type': 'Movie',
+                    'name': movie.get('title', ''),
+                    'description': movie.get('description', '')[:500],
+                    'image': movie.get('thumbnail', ''),
+                    'dateCreated': str(movie.get('year') or ''),
+                }),
             }
             get_token(request)
             return render(request, "video_detail.html", context)
