@@ -63,6 +63,8 @@ def classify_movie_category(title, description='', category='', metadata=None):
         return 'nollywood-tv-series' if series else 'nollywood-movie'
     if legacy in {'nollywood-movie', 'nollywood-tv-series'}:
         return legacy
+    if any(marker in text for marker in FOREIGN_MARKERS):
+        return 'other-foreign-series' if series else 'foreign-movie'
     if any(keyword in text for keyword in ('hollywood', 'american', 'usa', 'u.s.a')):
         return 'hollywood-tv-series' if series else 'hollywood-movie'
     if legacy in {'hollywood-movie', 'hollywood-tv-series'}:
