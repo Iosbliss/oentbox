@@ -637,7 +637,7 @@ class Command(BaseCommand):
             return detail_data
 
         detail_data['detail_page_ok'] = True
-        detail_data['source_category'] = self.extract_source_category(soup)
+        detail_data['source_category'] = self.extract_source_category(soup, link)
         detail_data['title'] = self.extract_detail_title(soup)
 
         detail_thumbnail = self.extract_detail_thumbnail(soup)
@@ -654,7 +654,7 @@ class Command(BaseCommand):
         detail_data['screenshots'] = self.extract_screenshots(soup)
         return detail_data
 
-    def extract_source_category(self, soup):
+    def extract_source_category(self, soup, link=''):
         category_aliases = {
             'foreign-movies': 'foreign-movie',
             'nollywood-movies': 'nollywood-movie',
@@ -662,6 +662,15 @@ class Command(BaseCommand):
             'hollywood-movies': 'hollywood-movie',
             'hollywood-series': 'hollywood-tv-series',
         }
+        known_slugs = set(category_aliases) | {
+            'anime', 'chinese-drama', 'filipino-drama', 'japanese-drama',
+            'korean-drama', 'other-foreign-series', 'thai-drama',
+            'turkish-drama',
+        }
+        link_path = urlparse(link).path.lower()
+        for slug in known_slugs:
+            if slug in link_path:
+                return category_aliases.get(slug, slug)
         for anchor in soup.find_all('a', href=True):
             match = re.search(r'/category/videodownload/([^/?#]+)', anchor['href'], re.IGNORECASE)
             if not match:
@@ -669,11 +678,7 @@ class Command(BaseCommand):
             slug = match.group(1).lower()
             if slug in category_aliases:
                 return category_aliases[slug]
-            if slug in {
-                'anime', 'chinese-drama', 'filipino-drama', 'japanese-drama',
-                'korean-drama', 'other-foreign-series', 'thai-drama',
-                'turkish-drama',
-            }:
+            if slug in known_slugs:
                 return slug
         return ''
 
