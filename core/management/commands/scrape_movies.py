@@ -336,7 +336,7 @@ class Command(BaseCommand):
         return url.split('?')[0].split('#')[0]
 
     def discover_sitemap_movie_links(self, session):
-        """Collect every movie URL listed in the WordPress post sitemaps."""
+        """Collect movie URLs newest-first using sitemap last-modified dates."""
         links = []
         seen = set()
         try:
@@ -357,13 +357,20 @@ class Command(BaseCommand):
             except requests.RequestException as error:
                 self.stdout.write(self.style.WARNING(f'Sitemap failed {sitemap_url}: {error}'))
                 continue
-            for loc in re.findall(r'<loc>\s*(.*?)\s*</loc>', response.text):
+            for entry in re.findall(r'<url\b[^>]*>(.*?)</url>', response.text, flags=re.IGNORECASE | re.DOTALL):
+                loc_match = re.search(r'<loc>\s*(.*?)\s*</loc>', entry, flags=re.IGNORECASE | re.DOTALL)
+                if not loc_match:
+                    continue
+                lastmod_match = re.search(r'<lastmod>\s*(.*?)\s*</lastmod>', entry, flags=re.IGNORECASE | re.DOTALL)
+                lastmod = lastmod_match.group(1).strip() if lastmod_match else ''
+                loc = loc_match.group(1).strip()
                 link = self.normalize_movie_link(loc)
                 if self.is_movie_link(link) and link not in seen:
                     seen.add(link)
-                    links.append(link)
+                    links.append((lastmod, link))
             time.sleep(random.uniform(0.4, 1.0))
-        return links
+        links.sort(key=lambda item: item[0], reverse=True)
+        return [link for _, link in links]
 
     def extract_last_page(self, html, category_path):
         pages = [
