@@ -235,13 +235,25 @@ class Command(BaseCommand):
         raise last_error
 
     def load_existing_movies(self, output_path):
+        existing_movies = []
         if not os.path.exists(output_path):
-            return []
-        try:
-            with open(output_path, 'r', encoding='utf-8') as handle:
-                return json.load(handle)
-        except (OSError, json.JSONDecodeError):
-            return []
+            existing_movies = []
+        else:
+            try:
+                with open(output_path, 'r', encoding='utf-8') as handle:
+                    existing_movies = json.load(handle)
+            except (OSError, json.JSONDecodeError):
+                existing_movies = []
+
+        database_movies = list(Movie.objects.values(
+            'id', 'title', 'description', 'thumbnail', 'link', 'year',
+            'category', 'source', 'scraped_at', 'video_info', 'trailer_url',
+            'trailer_embed_url', 'trailer_title', 'download_links',
+            'download_help_url', 'screenshots',
+        ))
+        if len(database_movies) > len(existing_movies):
+            return database_movies
+        return existing_movies
 
     def write_catalog(self, output_path, existing_movies, new_movies):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
