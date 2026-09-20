@@ -550,7 +550,12 @@ class Command(BaseCommand):
 
             info_year = (detail_data.get('video_info') or {}).get('Year', '')
             year = self.extract_year(title) or self.extract_year(f'({info_year})' if info_year else '')
-            category = self.extract_category(title, description, detail_data.get('video_info'))
+            category = self.extract_category(
+                title,
+                description,
+                detail_data.get('video_info'),
+                detail_data.get('source_category', ''),
+            )
             # Defensive guard: never persist movies whose category is on the
             # excluded list (e.g. sport-live). This complements the
             # category-archive filter and protects against future scraper
@@ -569,7 +574,10 @@ class Command(BaseCommand):
                 'source': '9jarocks',
                 'scraped_at': time.strftime('%Y-%m-%d %H:%M:%S')
             }
-            movie.update({key: value for key, value in detail_data.items() if key != 'title'})
+            movie.update({
+                key: value for key, value in detail_data.items()
+                if key not in {'title', 'source_category'}
+            })
             return movie
             
         except Exception as e:
@@ -604,6 +612,7 @@ class Command(BaseCommand):
             'download_links': [],
             'download_help_url': '',
             'screenshots': [],
+            'source_category': '',
             'detail_page_ok': False,
             'detail_page_error': '',
         }
@@ -628,6 +637,7 @@ class Command(BaseCommand):
             return detail_data
 
         detail_data['detail_page_ok'] = True
+        detail_data['source_category'] = self.extract_source_category(soup)
         detail_data['title'] = self.extract_detail_title(soup)
 
         detail_thumbnail = self.extract_detail_thumbnail(soup)
@@ -643,6 +653,29 @@ class Command(BaseCommand):
         detail_data['download_help_url'] = self.extract_download_help_url(soup)
         detail_data['screenshots'] = self.extract_screenshots(soup)
         return detail_data
+
+    def extract_source_category(self, soup):
+        category_aliases = {
+            'foreign-movies': 'foreign-movie',
+            'nollywood-movies': 'nollywood-movie',
+            'nollywood-series': 'nollywood-tv-series',
+            'hollywood-movies': 'hollywood-movie',
+            'hollywood-series': 'hollywood-tv-series',
+        }
+        for anchor in soup.find_all('a', href=True):
+            match = re.search(r'/category/videodownload/([^/?#]+)', anchor['href'], re.IGNORECASE)
+            if not match:
+                continue
+            slug = match.group(1).lower()
+            if slug in category_aliases:
+                return category_aliases[slug]
+            if slug in {
+                'anime', 'chinese-drama', 'filipino-drama', 'japanese-drama',
+                'korean-drama', 'other-foreign-series', 'thai-drama',
+                'turkish-drama',
+            }:
+                return slug
+        return ''
 
     def is_cloudflare_challenge(self, soup, raw_html=''):
         """Detect Cloudflare's managed/JS challenge pages.
@@ -1021,7 +1054,7 @@ class Command(BaseCommand):
         
         return None
     
-    def extract_category(self, title, description, video_info=None):
+    def extract_category(self, title, description, video_info=None, source_category=''):
         """Try to determine movie category"""
         title_lower = title.lower()
         desc_lower = description.lower() if description else ''
@@ -1033,7 +1066,12 @@ class Command(BaseCommand):
         if self.is_sport_title(text):
             return 'sport-live'
 
-        return classify_movie_category(title, description, metadata=video_info)
+        return classify_movie_category(
+            title,
+            description,
+            category=source_category,
+            metadata=video_info,
+        )
 
     # Patterns that flag a title as sport content (match highlights, wrestling,
     # league fixtures, etc.). They are deliberately specific to avoid false
