@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.utils import timezone
 from core.models import Movie
-from core.movie_data import classify_movie_category
+from core.movie_data import classify_movie_category, normalize_movie_category
 import os
 import time
 import random
@@ -252,8 +252,8 @@ class Command(BaseCommand):
             'download_help_url', 'screenshots',
         ))
         if len(database_movies) > len(existing_movies):
-            return database_movies
-        return existing_movies
+            existing_movies = database_movies
+        return [normalize_movie_category(movie) for movie in existing_movies]
 
     def write_catalog(self, output_path, existing_movies, new_movies):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)

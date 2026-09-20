@@ -1494,14 +1494,19 @@ def browse(request):
             queryset = queryset.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
             page_title = f'Search: {search_query}'
         if category != 'all':
-            queryset = queryset.filter(category=category)
+            category_values = [category]
+            category_values.extend(
+                legacy for legacy, normalized in LEGACY_CATEGORY_ALIASES.items()
+                if normalized == category
+            )
+            queryset = queryset.filter(category__in=category_values)
             page_title = category.replace('-', ' ').title()
         if year.isdigit():
             queryset = queryset.filter(year=int(year))
         if media_type == 'series':
-            queryset = queryset.filter(category='tv-series')
+            queryset = queryset.filter(category__in=['tv-series', 'hollywood-tv-series', 'nollywood-tv-series'])
         elif media_type == 'movie':
-            queryset = queryset.exclude(category='tv-series')
+            queryset = queryset.exclude(category__in=['tv-series', 'hollywood-tv-series', 'nollywood-tv-series'])
         if sort == 'title':
             queryset = queryset.order_by('title')
         elif sort == 'oldest':

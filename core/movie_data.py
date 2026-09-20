@@ -98,7 +98,14 @@ def load_movies():
 
 def get_movies_by_category(category, limit=None):
     """Get category results using a bounded database query."""
-    queryset = Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES).filter(category=category).values()
+    category = LEGACY_CATEGORY_ALIASES.get(category, category)
+    database_categories = [category]
+    database_categories.extend(
+        legacy for legacy, normalized in LEGACY_CATEGORY_ALIASES.items()
+        if normalized == category
+    )
+    queryset = (Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES)
+                .filter(category__in=database_categories).values())
     return _movie_values(queryset[:limit] if limit else queryset)
 
 def get_featured_movies(limit=6):
