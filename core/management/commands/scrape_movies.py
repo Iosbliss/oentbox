@@ -276,7 +276,7 @@ class Command(BaseCommand):
             merged_movies.append(movie)
         output_directory = os.path.dirname(output_path) or '.'
         with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=output_directory, delete=False) as handle:
-            json.dump(merged_movies, handle, indent=2, ensure_ascii=False)
+            json.dump(merged_movies, handle, indent=2, ensure_ascii=False, default=str)
             temporary_path = handle.name
         os.replace(temporary_path, output_path)
         # Purge any excluded-category rows (e.g. sport-live) that may have
