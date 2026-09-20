@@ -61,12 +61,12 @@ def classify_movie_category(title, description='', category='', metadata=None):
         if any(keyword in text for keyword in keywords):
             return specific_category
     series = any(keyword in text for keyword in ('season', 'episode', 'series', 'tv series'))
+    if 'bollywood' in text:
+        return 'bollywood-tv-series' if series else 'bollywood-movie'
     if any(keyword in text for keyword in ('nollywood', 'nigerian', 'naija', 'ghana')):
         return 'nollywood-tv-series' if series else 'nollywood-movie'
     if legacy in {'nollywood-movie', 'nollywood-tv-series'}:
         return legacy
-    if 'bollywood' in text:
-        return 'bollywood-tv-series' if series else 'bollywood-movie'
     if any(marker in text for marker in FOREIGN_MARKERS):
         return 'other-foreign-series' if series else 'foreign-movie'
     if any(keyword in text for keyword in ('hollywood', 'american', 'usa', 'u.s.a')):
