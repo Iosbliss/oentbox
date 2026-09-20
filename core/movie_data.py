@@ -16,6 +16,8 @@ CATEGORY_LABELS = {
     'nollywood-tv-series': 'Nollywood Series',
     'hollywood-movie': 'Hollywood Movies',
     'hollywood-tv-series': 'Hollywood Series',
+    'bollywood-movie': 'Bollywood Movies',
+    'bollywood-tv-series': 'Bollywood Series',
     'foreign-movie': 'Foreign Movies',
     'other-foreign-series': 'Other Foreign Series',
     'korean-drama': 'Korean Drama',
@@ -63,6 +65,8 @@ def classify_movie_category(title, description='', category='', metadata=None):
         return 'nollywood-tv-series' if series else 'nollywood-movie'
     if legacy in {'nollywood-movie', 'nollywood-tv-series'}:
         return legacy
+    if 'bollywood' in text:
+        return 'bollywood-tv-series' if series else 'bollywood-movie'
     if any(marker in text for marker in FOREIGN_MARKERS):
         return 'other-foreign-series' if series else 'foreign-movie'
     if any(keyword in text for keyword in ('hollywood', 'american', 'usa', 'u.s.a')):

@@ -48,6 +48,8 @@ LEGACY_CATEGORY_ALIASES = {
     "nollywood-series": "nollywood-tv-series",
     "hollywood-movies": "hollywood-movie",
     "hollywood-series": "hollywood-tv-series",
+    "bollywood-movies": "bollywood-movie",
+    "bollywood-series": "bollywood-tv-series",
 }
 
 SCRAPE_STATE = {
@@ -1234,6 +1236,8 @@ def home(request):
     anime = get_movies_by_category('anime', limit=home_row_limit)
     additional_categories = [
         ('Nollywood Series', 'nollywood-tv-series'),
+        ('Bollywood Movies', 'bollywood-movie'),
+        ('Bollywood Series', 'bollywood-tv-series'),
         ('Foreign Movies', 'foreign-movie'),
         ('Other Foreign Series', 'other-foreign-series'),
         ('Chinese Drama', 'chinese-drama'),
