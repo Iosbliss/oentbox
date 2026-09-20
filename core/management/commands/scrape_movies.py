@@ -668,6 +668,10 @@ class Command(BaseCommand):
             'turkish-drama',
         }
         link_path = urlparse(link).path.lower()
+        if 'nollywood' in link_path:
+            return 'nollywood-tv-series' if 'series' in link_path else 'nollywood-movie'
+        if 'bollywood' in link_path:
+            return 'bollywood-tv-series' if 'series' in link_path else 'bollywood-movie'
         for slug in known_slugs:
             if slug in link_path:
                 return category_aliases.get(slug, slug)
