@@ -40,7 +40,7 @@ class Command(BaseCommand):
             raise CommandError(str(error))
         finally:
             run.finished_at = timezone.now()
-            if ScrapeRun.objects.filter(pk=run.pk, status='running').exists():
+            if run.status in {'running', 'failed'}:
                 run.save(update_fields=[
                     'status', 'total_titles', 'new_titles', 'progress_current',
                     'progress_total', 'progress_message', 'error', 'finished_at',
