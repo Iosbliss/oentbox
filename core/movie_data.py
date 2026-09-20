@@ -59,7 +59,7 @@ def classify_movie_category(title, description='', category='', metadata=None):
         if any(keyword in text for keyword in keywords):
             return specific_category
     series = any(keyword in text for keyword in ('season', 'episode', 'series', 'tv series'))
-    if any(keyword in text for keyword in ('nollywood', 'nigerian', 'ghana')):
+    if any(keyword in text for keyword in ('nollywood', 'nigerian', 'naija', 'ghana')):
         return 'nollywood-tv-series' if series else 'nollywood-movie'
     if legacy in {'nollywood-movie', 'nollywood-tv-series'}:
         return legacy
