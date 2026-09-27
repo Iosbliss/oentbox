@@ -21,14 +21,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in {'1', 'true', 'yes'}
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in {'1', 'true', 'yes'}
 
 # Keep a convenient local default, but never allow production to start with it.
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
-    if not DEBUG:
-        raise RuntimeError('DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is False.')
-    SECRET_KEY = 'local-development-secret-key-change-this-before-deployment-9f6a4c2e'
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-dev-only-key-DO-NOT-USE-IN-PRODUCTION'
+    else:
+        raise RuntimeError('DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is not true.')
 
 SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'False').lower() in {'1', 'true', 'yes'}
 BEHIND_PROXY = os.environ.get('DJANGO_BEHIND_PROXY', 'False').lower() in {'1', 'true', 'yes'}
@@ -84,12 +85,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        "NAME": os.environ.get('DB_NAME', str(BASE_DIR / 'db.sqlite3')),
+        "ENGINE": os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
+        "NAME": os.environ.get('DB_NAME', 'oentbox'),
         "USER": os.environ.get('DB_USER', ''),
         "PASSWORD": os.environ.get('DB_PASSWORD', ''),
-        "HOST": os.environ.get('DB_HOST', ''),
-        "PORT": os.environ.get('DB_PORT', ''),
+        "HOST": os.environ.get('DB_HOST', '127.0.0.1'),
+        "PORT": os.environ.get('DB_PORT', '5432'),
     }
 }
 
@@ -148,7 +149,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static", BASE_DIR]
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 if SECURE_SSL_REDIRECT:

@@ -1,0 +1,28 @@
+# Copy to /opt/oentbox/ops/alert.conf (chmod 600) and uncomment ONE channel.
+# Settings may also live in /opt/oentbox/.env; alert.conf wins because it is read first.
+
+# --- Option 1: chat webhook (Slack / Discord / ntfy / Mattermost / Google Chat) ---
+# ALERT_WEBHOOK_KIND=slack          # slack (default, {"text": ...}), discord ({"content": ...}), ntfy (raw text)
+# ALERT_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+# ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/<id>/<token>
+# ALERT_WEBHOOK_URL=https://ntfy.sh/<your-topic>
+
+# --- Option 2: Telegram bot ---
+# ALERT_TELEGRAM_TOKEN=123456:ABC-DEF...
+# ALERT_TELEGRAM_CHAT_ID=123456789
+
+# --- Option 3: SMTP email ---
+# ALERT_EMAIL_TO=you@example.com
+# ALERT_EMAIL_FROM=oentbox@oentbox.com
+# ALERT_SMTP_HOST=smtp.example.com
+# ALERT_SMTP_PORT=587
+# ALERT_SMTP_USER=you@example.com
+# ALERT_SMTP_PASSWORD=app-password
+# ALERT_SMTP_TLS=1
+
+# --- thresholds / tuning ---
+# ALERT_REPEAT_SECONDS=86400        # re-alert cadence while a failure is unchanged
+# SCRAPE_MAX_AGE_HOURS=48           # alert if no new title has been scraped within this window
+# SCRAPE_STUCK_HOURS=6              # alert if a scrape run stays "running" this long
+# DOWNLOAD_ERRORS_MAX_24H=5         # alert above this many failed download jobs per day
+# DOWNLOAD_STUCK_HOURS=3            # alert if a download job makes no progress for this long

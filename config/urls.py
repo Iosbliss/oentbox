@@ -26,7 +26,7 @@ urlpatterns = [
     path("admin/scraper-status/", views.scraper_status, name="scraper_status"),
     path("admin/stop-scraper/", views.stop_scraper, name="stop_scraper"),
     path("admin/dashboard-data/", views.dashboard_data, name="dashboard_data"),
-    path("admin/", views.admin_dashboard, name="admin_dashboard"),
     path("admin/", admin.site.urls),
+    path("dashboard/", views.admin_dashboard, name="admin_dashboard"),
     path("", include("core.urls")),
 ]
