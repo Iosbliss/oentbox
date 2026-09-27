@@ -32,6 +32,13 @@ done
 check "TLS cert >14 days left"  bash -c 'E=$(curl -sS -m 15 -o /dev/null -w "%{ssl_verify_result}" https://oentbox.com/ 2>/dev/null); D=$(echo | openssl s_client -servername oentbox.com -connect oentbox.com:443 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2); [ -n "$D" ] && [ $(( $(date -d "$D" +%s) - $(date +%s) )) -gt 1209600 ]'
 check "disk / below 90%"        bash -c '[ $(df --output=pcent / | tail -1 | tr -dc 0-9) -lt 90 ]'
 check "DB reachable"            bash -c 'cd /opt/oentbox && set -a && . ./.env && set +a && .venv/bin/python manage.py check --database default >/dev/null'
+check "poster cache files exist"    bash -c 'ls -1 /opt/oentbox/image-cache/*.webp >/dev/null 2>&1'
+check "poster cache served 200"      bash -c 'F=$(ls -1 /opt/oentbox/image-cache/*.webp 2>/dev/null | head -1); [ -n "$F" ] && [ "$(curl -sS -o /dev/null -w "%{http_code}" -m 15 "https://oentbox.com/imgcache/$(basename "$F")")" = "200" ]'
+check "poster optimiser route live"  bash -c '[ "$(curl -sS -o /dev/null -w "%{http_code}" -m 15 "https://oentbox.com/img?u=https%3A%2F%2Fexample.invalid%2Fx.jpg&w=300")" = "302" ]'
+check "homepage posters local"       bash -c '[ $(curl -sS -m 25 https://oentbox.com/ | grep -o "/imgcache/" | wc -l) -ge 50 ]'
+check "poster cache writable"        bash -c 'runuser -u www-data -- test -w /opt/oentbox/image-cache'
+check "no stale image parts"         bash -c '[ -z "$(find /opt/oentbox/image-cache -name "*.part" -mmin +60 2>/dev/null)" ]'
+check "DB backup <26h old"      bash -c 'F=$(ls -1t /var/backups/oentbox/oentbox-*.dump 2>/dev/null | head -1); [ -n "$F" ] && [ $(( $(date +%s) - $(stat -c %Y "$F") )) -lt 93600 ]'
 
 if [ "$FAIL" = "1" ]; then
   say "=== HEALTH CHECK FAILED ==="

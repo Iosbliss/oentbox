@@ -42,10 +42,28 @@ if ! out=$(/usr/bin/python3 ops/scan_staticfiles.py 2>&1); then
 fi
 say "OK   leak guard"
 
+# 5b. the service user must be able to read the code and boot the app.
+# A root-only file or an import error here is a 502 the moment gunicorn restarts,
+# so catch it before restarting anything.
+chgrp -R www-data "$APP"/core "$APP"/config "$APP"/templates "$APP"/static "$APP"/ops 2>/dev/null || true
+chmod -R g+r "$APP"/core "$APP"/config "$APP"/templates "$APP"/static "$APP"/ops 2>/dev/null || true
+if ! runuser -u www-data -- bash -c "cd $APP && set -a && . ./.env && set +a && .venv/bin/python -c 'import config.wsgi'" >/dev/null 2>&1; then
+  say "ABORT: the app cannot be imported as www-data"
+  runuser -u www-data -- bash -c "cd $APP && set -a && . ./.env && set +a && .venv/bin/python -c 'import config.wsgi'" 2>&1 | tail -6 | tee -a "$LOG"
+  fail "app fails to import as www-data (file permissions or import error) - refusing to restart"
+fi
+say "OK   app imports as the service user"
+
 # 6. restart + verify
 systemctl restart oentbox oentbox-celery || fail "service restart failed"
 sleep 4
 say "OK   services restarted"
+
+# 6b. pre-warm the poster cache so visitors never trigger the optimiser
+if [ -f "$APP"/ops/warm_images.py ]; then
+  nohup runuser -u www-data -- "$APP"/.venv/bin/python "$APP"/ops/warm_images.py     >> /var/log/oentbox-warm.log 2>&1 &
+  say "OK   poster cache warm started in background"
+fi
 if ops/health_check.sh >/dev/null 2>&1; then
   say "=== deploy verified OK ==="
 else

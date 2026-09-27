@@ -1,14 +1,16 @@
 from django.urls import path
 
-from . import views
+from . import imageproxy, seo, views
 
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("img", imageproxy.image_proxy, name="image_proxy"),
     path("sw.js", views.service_worker, name="service_worker"),
     path("robots.txt", views.robots, name="robots"),
     path("favicon.ico", views.favicon, name="favicon"),
-    path("sitemap.xml", views.sitemap, name="sitemap"),
+    path("sitemap.xml", seo.sitemap_index, name="sitemap"),
+    path("sitemap-<int:chunk>.xml", seo.sitemap_chunk, name="sitemap_chunk"),
     path("index.html", views.home, name="home_file"),
     path("about.html", views.about, name="about"),
     path("privacy.html", views.privacy, name="privacy"),

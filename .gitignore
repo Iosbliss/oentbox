@@ -8,3 +8,7 @@ venv/
 env/
 .pytest_cache/
 .DS_Store
+# runtime artefacts (generated on the server)
+image-cache/
+staticfiles/
+*.webp.part
