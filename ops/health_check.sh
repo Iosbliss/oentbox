@@ -23,6 +23,7 @@ for f in db.sqlite3 settings.py manage.py requirements.txt; do
   check "sentinel /static/$f blocked" bash -c "[ \"\$(curl -sS -o /dev/null -w \"%{http_code}\" -m 15 https://oentbox.com/static/$f)\" != \"200\" ]"
 done
 check "no sensitive files in staticfiles" /usr/bin/python3 /opt/oentbox/ops/scan_staticfiles.py
+check "static dirs config safe"  /usr/bin/python3 /opt/oentbox/ops/guard_static_dirs.py
 check "admin login reachable"   bash -c 'C=$(curl -sS -o /dev/null -w "%{http_code}" -m 15 https://oentbox.com/admin/login/); [ "$C" = "200" ] || [ "$C" = "302" ]'
 check "gunicorn socket"         bash -c '[ -S /run/oentbox/oentbox.sock ]'
 for s in oentbox oentbox-celery nginx redis-server postgresql; do

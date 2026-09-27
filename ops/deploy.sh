@@ -13,8 +13,8 @@ fail() { say "ABORT: $*"; send_alert "oentbox deploy aborted" "$*"; exit 1; }
 say "=== deploy start (git $(git rev-parse --short HEAD 2>/dev/null || echo unknown)) ==="
 
 # 1. config guard: static dirs must never include the project root again
-if grep -qE 'STATICFILES_DIRS *= *\[[^]]*BASE_DIR *[,\]]' config/settings.py; then
-  fail "STATICFILES_DIRS includes BASE_DIR - refusing to collect source files into staticfiles"
+if ! out=$(/usr/bin/python3 ops/guard_static_dirs.py config/settings.py 2>&1); then
+  fail "$out"
 fi
 say "OK   static dirs config guard"
 
@@ -37,7 +37,9 @@ say "OK   migrations applied"
 say "OK   collectstatic"
 
 # 5. leak guard: nothing sensitive may be web-served
-out=$(/usr/bin/python3 ops/scan_staticfiles.py 2>&1) || fail "leak guard tripped: $out"
+if ! out=$(/usr/bin/python3 ops/scan_staticfiles.py 2>&1); then
+  fail "leak guard tripped: $out"
+fi
 say "OK   leak guard"
 
 # 6. restart + verify
