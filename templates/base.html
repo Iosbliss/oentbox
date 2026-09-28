@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}oentbox{% endblock %}</title>
 <meta name="description" content="{% block description %}oentbox entertainment discovery.{% endblock %}">
@@ -13,6 +13,10 @@
 <link rel="manifest" href="{% static 'manifest.json' %}">
 <meta name="theme-color" content="#0B0D10">
 <link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="oentbox">
+{% block seo %}{% endblock %}
 {% block extra_head %}{% endblock %}
 </head>
 <body{% block body_attributes %}{% endblock %}>

@@ -10,7 +10,7 @@ from unittest.mock import patch
 from .models import ActivityEvent, DownloadJob, Movie, SavedMovie, ScrapeRun
 from . import views
 from .management.commands.scrape_movies import Command
-from .movie_data import classify_movie_category
+from .movie_data import classify_movie_category, load_movies
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -30,10 +30,27 @@ class DashboardTests(TestCase):
 
 	def test_categories_match_country_and_media_type(self):
 		self.assertEqual(classify_movie_category('Wura Season 4', 'Nigerian series'), 'nollywood-tv-series')
+		self.assertEqual(classify_movie_category('Wura Season 4', 'Drama episode'), 'nollywood-tv-series')
+		self.assertEqual(classify_movie_category('A New Love Story', 'Drama episode', category='nollywood-series', metadata='American TV series'), 'nollywood-tv-series')
+		self.assertEqual(classify_movie_category('Bob Hearts Abishola Season 1', 'An American sitcom about a Nigerian immigrant'), 'hollywood-tv-series')
 		self.assertEqual(classify_movie_category('Single Black Tenant', 'American movie'), 'hollywood-movie')
 		self.assertEqual(classify_movie_category('Love on the Menu Season 1', 'Korean Drama'), 'korean-drama')
 		self.assertEqual(classify_movie_category('Fantastic Doctors Season 1', 'Chinese Drama'), 'chinese-drama')
-		self.assertEqual(classify_movie_category('Romeo Akbar Walter', 'Bollywood Movie'), 'foreign-movie')
+		self.assertEqual(classify_movie_category('Romeo Akbar Walter', 'Bollywood Movie'), 'bollywood-movie')
+		self.assertEqual(
+			classify_movie_category('Ordinary People Season 1', '', metadata={'Country': 'Nigeria'}),
+			'nollywood-tv-series',
+		)
+
+	def test_rendering_preserves_stored_category(self):
+		Movie.objects.create(
+			id='stored-category', title='Wu Assassins Season 1',
+			description='A Korean action series',
+			link='https://example.com/stored-category',
+			category='other-foreign-series', scraped_at=timezone.now(),
+		)
+		movie = load_movies()[0]
+		self.assertEqual(movie['category'], 'other-foreign-series')
 
 	def test_dashboard_data_includes_catalog_and_history(self):
 		Movie.objects.create(id='movie-1', title='Test Movie', link='https://example.com/movie-1', category='hollywood', scraped_at=timezone.now())
@@ -93,11 +110,11 @@ class DashboardTests(TestCase):
 	def test_browse_filters_by_year_and_type(self):
 		Movie.objects.create(
 			id='filter-series', title='Filtered Series', link='https://example.com/filter-series',
-			category='tv-series', year=2099, scraped_at=timezone.now(),
+			category='hollywood-tv-series', year=2099, scraped_at=timezone.now(),
 		)
 		Movie.objects.create(
 			id='filter-movie', title='Filtered Movie', link='https://example.com/filter-movie',
-			category='hollywood', year=2025, scraped_at=timezone.now(),
+			category='hollywood-movie', year=2025, scraped_at=timezone.now(),
 		)
 		response = Client().get(reverse('browse'), {'year': '2099', 'type': 'series'})
 		self.assertEqual(response.context['total_movies'], 1)
@@ -199,6 +216,13 @@ class DashboardTests(TestCase):
 	def test_youtube_publish_date_rejects_invalid_video_id(self):
 		response = self.client.get(reverse('youtube_publish_date'), {'id': 'invalid'})
 		self.assertEqual(response.status_code, 400)
+
+	@patch('core.views._youtube_location_profile', return_value=('Trending near you', ('music',)))
+	@patch('core.views._youtube_search', return_value=[])
+	def test_youtube_search_clamps_expensive_result_limit(self, search, location):
+		response = Client().get(reverse('youtube_search'), {'q': 'music', 'limit': 100})
+		self.assertEqual(response.status_code, 200)
+		search.assert_called_once_with('music', limit=24)
 
 	def test_download_pause_persists_control_state(self):
 		job = DownloadJob.objects.create(

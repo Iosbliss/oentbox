@@ -1,4 +1,4 @@
-{% load static %}
+{% load static image_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>oentbox — Entertainment, Reimagined</title>
 <meta name="description" content="A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.">
+<link rel="canonical" href="https://oentbox.com/">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="oentbox — Entertainment, Reimagined">
+<meta property="og:description" content="A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oentbox.com/">
+<meta property="og:image" content="https://oentbox.com/static/img/og-image-oentbox.jpg">
+<meta property="og:site_name" content="oentbox">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="oentbox — Entertainment, Reimagined">
+<meta name="twitter:description" content="A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"oentbox","url":"https://oentbox.com/","description":"A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.","potentialAction":{"@type":"SearchAction","target":"https://oentbox.com/browse.html?cat=all&q={search_term_string}","query-input":"required name=search_term_string"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -120,7 +132,7 @@
         {% for movie in featured_movies|slice:":3" %}
         <article class="hero__slide" style="--hue:{{ forloop.counter|add:25 }};">
           <div class="hero__art" 
-               style="{% if movie.thumbnail %}background-image: url('{{ movie.thumbnail }}'); background-size: cover; background-position: center;{% endif %}" 
+               style="{% if movie.thumbnail %}background-image: url('{{ movie.thumbnail|poster:780 }}'); background-size: cover; background-position: center;{% endif %}" 
                data-glyph="{% if forloop.counter == 1 %}film{% elif forloop.counter == 2 %}mask{% else %}crown{% endif %}">
           </div>
           <div class="hero__copy">
@@ -193,7 +205,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -221,7 +233,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -249,7 +261,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -278,7 +290,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -307,7 +319,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -335,7 +347,7 @@
       <article class="card" data-movie-id="{{ movie.id }}">
         <a class="card__media" href="video_detail.html?id={{ movie.id }}">
           {% if movie.thumbnail %}
-          <img src="{{ movie.thumbnail }}" alt="{{ movie.title }}" loading="lazy">
+          <img src="{{ movie.thumbnail|poster:300 }}" alt="{{ movie.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}

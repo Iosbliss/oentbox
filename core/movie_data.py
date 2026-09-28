@@ -41,8 +41,20 @@ CATEGORY_KEYWORDS = (
 
 LEGACY_CATEGORY_ALIASES = {
     'nollywood': 'nollywood-movie',
+    'nollywood-series': 'nollywood-tv-series',
+    'nollywood-movies': 'nollywood-movie',
+    'nollywood-movie': 'nollywood-movie',
+    'nollywood-tv-series': 'nollywood-tv-series',
     'tv-series': 'hollywood-tv-series',
     'hollywood': 'hollywood-movie',
+    'hollywood-movies': 'hollywood-movie',
+    'hollywood-series': 'hollywood-tv-series',
+    'hollywood-movie': 'hollywood-movie',
+    'hollywood-tv-series': 'hollywood-tv-series',
+    'bollywood-movies': 'bollywood-movie',
+    'bollywood-series': 'bollywood-tv-series',
+    'bollywood-movie': 'bollywood-movie',
+    'foreign-series': 'other-foreign-series',
 }
 
 
@@ -52,38 +64,54 @@ FOREIGN_MARKERS = (
     'arabic', 'indonesian', 'malaysian', 'russian', 'vietnamese', 'portuguese',
 )
 
+NIGERIAN_TITLE_MARKERS = ('wura',)
+NIGERIAN_PRODUCTION_MARKERS = (
+    'nollywood', 'naija', 'bbnaija', 'big brother naija',
+    'nigerian movie', 'nigerian series', 'nigerian film', 'nigerian drama',
+)
+
 
 def classify_movie_category(title, description='', category='', metadata=None):
     """Match 9jaRocks-style country/type groups from title and description."""
     text = f'{title} {description} {metadata or ""}'.lower()
+    metadata_country = str(metadata.get('Country', '') if isinstance(metadata, dict) else '').lower()
     legacy = LEGACY_CATEGORY_ALIASES.get(category, category)
+    if legacy in {'nollywood-movie', 'nollywood-tv-series', 'nollywood-series'}:
+        return legacy
+    if legacy in {'bollywood-movie', 'bollywood-tv-series', 'bollywood-series'}:
+        return legacy
+    if legacy in {'hollywood-movie', 'hollywood-tv-series', 'hollywood-series'}:
+        if any(marker in text for marker in FOREIGN_MARKERS):
+            return 'other-foreign-series' if any(keyword in text for keyword in ('season', 'episode', 'series', 'tv series')) else 'foreign-movie'
+        return legacy
     for specific_category, keywords in CATEGORY_KEYWORDS:
         if any(keyword in text for keyword in keywords):
             return specific_category
     series = any(keyword in text for keyword in ('season', 'episode', 'series', 'tv series'))
     if 'bollywood' in text:
         return 'bollywood-tv-series' if series else 'bollywood-movie'
-    if any(keyword in text for keyword in ('nollywood', 'nigerian', 'naija', 'ghana')):
+    title_text = str(title or '').lower()
+    if 'nigeria' in metadata_country or any(marker in text for marker in NIGERIAN_PRODUCTION_MARKERS) or any(
+        marker in title_text for marker in NIGERIAN_TITLE_MARKERS
+    ) or any(marker in title_text for marker in ('nigerian', 'ghanaian')):
         return 'nollywood-tv-series' if series else 'nollywood-movie'
-    if legacy in {'nollywood-movie', 'nollywood-tv-series'}:
-        return legacy
     if any(marker in text for marker in FOREIGN_MARKERS):
         return 'other-foreign-series' if series else 'foreign-movie'
     if any(keyword in text for keyword in ('hollywood', 'american', 'usa', 'u.s.a')):
         return 'hollywood-tv-series' if series else 'hollywood-movie'
-    if legacy in {'hollywood-movie', 'hollywood-tv-series'}:
-        if any(marker in text for marker in FOREIGN_MARKERS):
-            return 'other-foreign-series' if series else 'foreign-movie'
-        return legacy
     return 'other-foreign-series' if series else 'foreign-movie'
 
 
 def normalize_movie_category(movie):
-    """Normalize old records into the same groups used by new scrapes."""
-    movie['category'] = classify_movie_category(
-        movie.get('title', ''), movie.get('description', ''), movie.get('category', ''),
-        movie.get('video_info', ''),
-    )
+    """Normalize only known legacy labels without reclassifying stored records.
+
+    Category inference belongs to the scraper. Re-running it while rendering
+    pages makes the same record appear in different categories depending on
+    which view loaded it, and can misclassify titles from incidental words in
+    their descriptions or metadata.
+    """
+    category = movie.get('category', '')
+    movie['category'] = LEGACY_CATEGORY_ALIASES.get(category, category)
     return movie
 
 def load_movies():
@@ -102,8 +130,41 @@ def load_movies():
         print(f"Error loading movies: {e}")
         return []
 
+# Category rows are identical for every visitor, so the result is cached in the
+# shared cache backend (Redis in production). The home page alone renders ~16
+# category rows, which previously meant ~16 uncached queries per request.
+CATALOG_CACHE_TTL = int(os.environ.get('CATALOG_CACHE_TTL', '300'))
+
+
+def count_movies():
+    """Number of catalog titles, cached.
+
+    The about page only needs the total, so a single COUNT replaces loading
+    every row (22k+ titles) into Python just to take its length.
+    """
+    cached = cache.get('catalog:count')
+    if cached is not None:
+        return cached
+    if Movie.objects.exists():
+        total = Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES).count()
+    else:
+        total = len(load_movies())
+    cache.set('catalog:count', total, CATALOG_CACHE_TTL)
+    return total
+
+
+def _cached_movie_values(cache_key, queryset, limit=None):
+    """Return picklable movie dicts from the cache, filling it on a miss."""
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    values = _movie_values(queryset[:limit] if limit else queryset)
+    cache.set(cache_key, values, CATALOG_CACHE_TTL)
+    return values
+
+
 def get_movies_by_category(category, limit=None):
-    """Get category results using a bounded database query."""
+    """Get category results using a bounded, cached database query."""
     category = LEGACY_CATEGORY_ALIASES.get(category, category)
     database_categories = [category]
     database_categories.extend(
@@ -112,12 +173,12 @@ def get_movies_by_category(category, limit=None):
     )
     queryset = (Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES)
                 .filter(category__in=database_categories).values())
-    return _movie_values(queryset[:limit] if limit else queryset)
+    return _cached_movie_values(f'catalog:category:{category}:{limit or 0}', queryset, limit)
 
 def get_featured_movies(limit=6):
-    """Get featured movies using the catalog ordering."""
-    queryset = Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES).values()[:limit]
-    return _movie_values(queryset)
+    """Get featured movies using the cached catalog ordering."""
+    queryset = Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES).values()
+    return _cached_movie_values(f'catalog:featured:{limit}', queryset, limit)
 
 def get_movie_by_id(movie_id):
     """Get one movie without loading the full catalog."""
