@@ -12,3 +12,8 @@ env/
 image-cache/
 staticfiles/
 *.webp.part
+
+# local-only files (backups, private config, scraper temp)
+*.bak-*
+ops/alert.conf
+scraper/tmp*
