@@ -17,7 +17,6 @@ urlpatterns = [
     path("terms.html", views.terms, name="terms"),
     path("youtube.html", views.youtube_page, name="youtube"),
     path("youtube/video.html", views.youtube_video_detail, name="youtube_video_detail"),
-    path("downloads.html", views.download_manager, name="download_manager"),
     path("browse.html", views.browse, name="browse"),
     path("saved.html", views.saved, name="saved"),
     path("video_detail.html", views.title_detail, name="video_detail"),

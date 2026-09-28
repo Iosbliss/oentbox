@@ -31,6 +31,7 @@ from django.utils.text import get_valid_filename
 from collections import Counter
 from django.utils import timezone
 from .models import ActivityEvent, DownloadJob, Movie, SavedMovie, ScrapeRun
+from .seo import build_movie_schema
 from .movie_data import (
     CATEGORY_LABELS,
     LEGACY_CATEGORY_ALIASES,
@@ -39,18 +40,10 @@ from .movie_data import (
     get_movie_by_id,
     get_categories,
     search_movies,
+    count_movies,
     load_movies
 )
 
-LEGACY_CATEGORY_ALIASES = {
-    **LEGACY_CATEGORY_ALIASES,
-    "nollywood-movies": "nollywood-movie",
-    "nollywood-series": "nollywood-tv-series",
-    "hollywood-movies": "hollywood-movie",
-    "hollywood-series": "hollywood-tv-series",
-    "bollywood-movies": "bollywood-movie",
-    "bollywood-series": "bollywood-tv-series",
-}
 
 SCRAPE_STATE = {
     'running': False,
@@ -193,11 +186,6 @@ def youtube_page(request):
             *({'label': query, 'query': query} for query in queries[1:]),
         ],
     })
-
-
-def download_manager(request):
-    get_token(request)
-    return render(request, 'download_manager.html')
 
 
 def _format_duration(seconds):
@@ -473,33 +461,9 @@ def _youtube_search(query, limit=12):
             reverse=True,
         )
     ]
-    publish_candidates = [video for video in summaries if not video['published']][:12]
-
-    def resolve_publish_time(video):
-        try:
-            detail_options = {'quiet': True, 'no_warnings': True, 'skip_download': True}
-            with yt_dlp.YoutubeDL(detail_options) as downloader:
-                info = downloader.extract_info(video['url'], download=False)
-            return video, _relative_publish_time(info)
-        except Exception as error:
-            logger.debug('YouTube publish date lookup failed: %s', error)
-            return video, ''
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        for video, published in executor.map(resolve_publish_time, publish_candidates):
-            video['published'] = published
-
-    missing_avatars = [
-        video for video in summaries
-        if not video['channel_thumbnail'] and (video['channel_url'] or video['channel_id'])
-    ]
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        thumbnails = executor.map(
-            lambda video: _channel_thumbnail(video['channel_url'], video['channel_id']),
-            missing_avatars,
-        )
-        for video, thumbnail in zip(missing_avatars, thumbnails):
-            video['channel_thumbnail'] = thumbnail
+    # Publish dates and avatars are hydrated asynchronously by the browser.
+    # Keeping those lookups out of this request prevents slow upstream calls
+    # from blocking a Gunicorn worker.
     return summaries
 
 
@@ -583,10 +547,10 @@ def youtube_search(request):
     if len(query) > 100:
         return JsonResponse({'error': 'Search is limited to 100 characters.'}, status=400)
     try:
-        limit = int(request.GET.get('limit', 50))
+        limit = int(request.GET.get('limit', 12))
     except ValueError:
-        limit = 50
-    limit = max(6, min(limit, 100))
+        limit = 12
+    limit = max(6, min(limit, 24))
     feed_random = _visitor_feed_random(request)
     _, discovery_queries = _youtube_location_profile(request)
     resolved_query = query or feed_random.choice(discovery_queries)
@@ -1295,7 +1259,7 @@ def dashboard_titles():
         result.append({
             'id': movie.get('id', ''), 'title': movie.get('title', ''),
             'category': movie.get('category', 'unknown'),
-            'type': video_info.get('Type') or ('TV Series' if movie.get('category') == 'tv-series' else 'Movie'),
+            'type': video_info.get('Type') or ('TV Series' if movie.get('category', '').endswith('-tv-series') else 'Movie'),
             'year': movie.get('year') or video_info.get('Year') or '',
             'thumbnail': bool(movie.get('thumbnail')),
             'scraped_at': movie.get('scraped_at', ''),
@@ -1353,7 +1317,7 @@ def run_scraper(request):
         SCRAPE_STATE['current'] = 0
         SCRAPE_STATE['total'] = 0
 
-    started_count = len(load_movies())
+    started_count = count_movies()
     try:
         scrape_run = ScrapeRun.objects.create(status='running', total_titles=started_count)
     except Exception:
@@ -1463,7 +1427,7 @@ def track_activity(request):
 
 def about(request):
     """About page"""
-    total_movies = len(load_movies())
+    total_movies = count_movies()
     categories = get_categories()
     
     context = {
@@ -1508,9 +1472,9 @@ def browse(request):
         if year.isdigit():
             queryset = queryset.filter(year=int(year))
         if media_type == 'series':
-            queryset = queryset.filter(category__in=['tv-series', 'hollywood-tv-series', 'nollywood-tv-series'])
+            queryset = queryset.filter(category__in=['hollywood-tv-series', 'nollywood-tv-series', 'bollywood-tv-series', 'other-foreign-series'])
         elif media_type == 'movie':
-            queryset = queryset.exclude(category__in=['tv-series', 'hollywood-tv-series', 'nollywood-tv-series'])
+            queryset = queryset.exclude(category__in=['hollywood-tv-series', 'nollywood-tv-series', 'bollywood-tv-series', 'other-foreign-series'])
         if sort == 'title':
             queryset = queryset.order_by('title')
         elif sort == 'oldest':
@@ -1667,14 +1631,7 @@ def title_detail(request):
                 'related_movies': related,
                 'has_movie': True,
                 'canonical_url': request.build_absolute_uri(f'/video_detail.html?id={quote(movie_id)}'),
-                'seo_json': json.dumps({
-                    '@context': 'https://schema.org',
-                    '@type': 'Movie',
-                    'name': movie.get('title', ''),
-                    'description': movie.get('description', '')[:500],
-                    'image': movie.get('thumbnail', ''),
-                    'dateCreated': str(movie.get('year') or ''),
-                }),
+                'seo_json': json.dumps(build_movie_schema(movie, request)),
             }
             get_token(request)
             return render(request, "video_detail.html", context)
@@ -1685,7 +1642,11 @@ def title_detail(request):
         context = {
             'movie': movies[0],
             'related_movies': get_featured_movies(limit=5)[1:6],
-            'has_movie': True
+            'has_movie': True,
+            'canonical_url': request.build_absolute_uri(
+                f'/video_detail.html?id={quote(movies[0]["id"])}'
+            ),
+            'seo_json': json.dumps(build_movie_schema(movies[0], request)),
         }
     else:
         context = {'has_movie': False}

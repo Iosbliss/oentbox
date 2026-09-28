@@ -10,8 +10,12 @@
 <meta property="og:title" content="{{ video.title|escape }}">
 <meta property="og:description" content="Watch {{ video.title|escape }} on YouTube.">
 <meta property="og:type" content="video.other">
-<meta property="og:image" content="{{ video.thumbnail }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="oentbox">
+{% if video.thumbnail %}<meta property="og:image" content="{{ video.thumbnail }}">{% endif %}
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ video.title|escape }}">
+<meta name="twitter:description" content="Watch {{ video.title|escape }} on oentbox YouTube videos.">
 <script type="application/ld+json">{{ seo_json|safe }}</script>{% endif %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -50,15 +54,15 @@
       <li class="has-mega">
         <button class="navrow__link" data-navkey="nollywood">Nollywood</button>
         <div class="mega">
-          <a href="/browse.html?cat=nollywood-movies">Movies</a>
-          <a href="/browse.html?cat=nollywood-series">TV Series</a>
+          <a href="/browse.html?cat=nollywood-movie">Movies</a>
+          <a href="/browse.html?cat=nollywood-tv-series">TV Series</a>
         </div>
       </li>
       <li class="has-mega">
         <button class="navrow__link" data-navkey="hollywood">Hollywood</button>
         <div class="mega">
-          <a href="/browse.html?cat=hollywood-movies">Movies</a>
-          <a href="/browse.html?cat=hollywood-series">TV Series</a>
+          <a href="/browse.html?cat=hollywood-movie">Movies</a>
+          <a href="/browse.html?cat=hollywood-tv-series">TV Series</a>
         </div>
       </li>
       <li class="has-mega">
@@ -93,8 +97,8 @@
 <div class="mobile-menu" id="mobileMenu">
   <div class="mobile-menu__group">
     <span class="mobile-menu__label">Browse</span>
-    <a href="/browse.html?cat=nollywood-movies">Nollywood</a>
-    <a href="/browse.html?cat=hollywood-movies">Hollywood</a>
+    <a href="/browse.html?cat=nollywood-movie">Nollywood</a>
+    <a href="/browse.html?cat=hollywood-movie">Hollywood</a>
     <a href="/browse.html?cat=korean-drama">World Drama</a>
     <a href="/browse.html?cat=anime">Anime</a>
     <a href="/browse.html?cat=all">A–Z Library</a>
@@ -244,8 +248,8 @@
     </div>
     <div>
       <h4>Browse</h4>
-      <a href="/browse.html?cat=nollywood-movies">Nollywood</a>
-      <a href="/browse.html?cat=hollywood-movies">Hollywood</a>
+      <a href="/browse.html?cat=nollywood-movie">Nollywood</a>
+      <a href="/browse.html?cat=hollywood-movie">Hollywood</a>
       <a href="/browse.html?cat=korean-drama">World Drama</a>
       <a href="/browse.html?cat=anime">Anime</a>
     </div>
@@ -290,6 +294,6 @@
 </nav>
 
 <script src="{% static 'js/common.js' %}?v=2"></script>
-<script src="{% static 'js/youtube.js' %}?v=7"></script>
+<script src="{% static 'js/youtube.js' %}?v=8"></script>
 </body>
 </html>

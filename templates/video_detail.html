@@ -1,20 +1,24 @@
-{% load static %}
+{% load static image_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Video Detail — oentbox</title>
-{% if movie %}<meta name="description" content="{{ movie.title|escape }}{% if movie.description %} - {{ movie.description|truncatechars:150|escape }}{% endif %}">
-<link rel="canonical" href="{{ canonical_url }}">
-<meta property="og:title" content="{{ movie.title|escape }} - oentbox">
+<title>{% if movie %}{{ movie.title|escape }} - oentbox{% else %}Video Detail — oentbox{% endif %}</title>
+<meta name="description" content="{% if movie %}{{ movie.title|escape }}{% if movie.description %} - {{ movie.description|truncatechars:150|escape }}{% endif %}{% else %}Entertainment movies and TV series on oentbox{% endif %}">
+{% if movie %}<link rel="canonical" href="{{ canonical_url }}">{% else %}<link rel="canonical" href="https://oentbox.com/video_detail.html">{% endif %}
+<meta property="og:url" content="{% if movie %}{{ canonical_url }}{% else %}https://oentbox.com/video_detail.html{% endif %}">
+<meta property="og:site_name" content="oentbox">
+{% if movie %}<meta property="og:title" content="{{ movie.title|escape }}">
 <meta property="og:description" content="{{ movie.description|default:movie.title|truncatechars:200|escape }}">
 <meta property="og:type" content="video.movie">
 {% if movie.thumbnail %}<meta property="og:image" content="{{ movie.thumbnail }}">{% endif %}
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{{ seo_json|safe }}</script>{% endif %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<meta name="twitter:title" content="{{ movie.title|escape }}">
+<meta name="twitter:description" content="Watch {{ movie.title|escape }} on oentbox.">
+<script type="application/ld+json">{{ seo_json|safe }}</script>
+{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=2">
 <link rel="manifest" href="{% static 'manifest.json' %}">
@@ -50,15 +54,15 @@
       <li class="has-mega">
         <button class="navrow__link" data-navkey="nollywood">Nollywood</button>
         <div class="mega">
-          <a href="browse.html?cat=nollywood-movies">Movies</a>
-          <a href="browse.html?cat=nollywood-series">TV Series</a>
+          <a href="browse.html?cat=nollywood-movie">Movies</a>
+          <a href="browse.html?cat=nollywood-tv-series">TV Series</a>
         </div>
       </li>
       <li class="has-mega">
         <button class="navrow__link" data-navkey="hollywood">Hollywood</button>
         <div class="mega">
-          <a href="browse.html?cat=hollywood-movies">Movies</a>
-          <a href="browse.html?cat=hollywood-series">TV Series</a>
+          <a href="browse.html?cat=hollywood-movie">Movies</a>
+          <a href="browse.html?cat=hollywood-tv-series">TV Series</a>
         </div>
       </li>
       <li class="has-mega">
@@ -93,8 +97,8 @@
 <div class="mobile-menu" id="mobileMenu">
   <div class="mobile-menu__group">
     <span class="mobile-menu__label">Browse</span>
-    <a href="browse.html?cat=nollywood-movies">Nollywood</a>
-    <a href="browse.html?cat=hollywood-movies">Hollywood</a>
+    <a href="browse.html?cat=nollywood-movie">Nollywood</a>
+    <a href="browse.html?cat=hollywood-movie">Hollywood</a>
     <a href="browse.html?cat=korean-drama">World Drama</a>
     <a href="browse.html?cat=anime">Anime</a>
     <a href="browse.html?cat=all">A–Z Library</a>
@@ -113,11 +117,11 @@
 
 <main>
   {% if has_movie %}
-  <section class="detail-hero" id="detailHero" style="background: linear-gradient(to right, rgba(0,0,0,0.9), rgba(0,0,0,0.4)), url('{{ movie.thumbnail }}') center/cover no-repeat;">
+  <section class="detail-hero" id="detailHero" style="background: linear-gradient(to right, rgba(0,0,0,0.9), rgba(0,0,0,0.4)), url('{{ movie.thumbnail|poster:780 }}') center/cover no-repeat;">
     <div class="detail-hero__inner video-detail__hero-inner">
       {% if movie.thumbnail %}
       <div class="video-detail__poster">
-        <img src="{{ movie.thumbnail }}" alt="{{ movie.title }} poster">
+        <img src="{{ movie.thumbnail|poster:480 }}" alt="{{ movie.title }} poster" width="300" height="450" decoding="async">
       </div>
       {% endif %}
       <div class="video-detail__hero-copy">
@@ -209,7 +213,7 @@
                 <div class="video-detail__download-label">{{ item.label|default:"Download" }}</div>
                 <div class="video-detail__download-text">{{ item.text }}</div>
               </div>
-              <a href="/downloads.html?url={{ item.url|urlencode }}&title={{ movie.title|urlencode }}&label={{ item.label|urlencode }}" class="btn btn--primary js-download-link" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Download</a>
+              <a href="{{ item.url }}" target="_blank" rel="noopener nofollow" class="btn btn--primary js-download-link" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Download</a>
             </div>
             {% endfor %}
           </div>
@@ -225,7 +229,7 @@
           <div class="video-detail__screenshots">
             {% for screenshot in movie.screenshots %}
             <a href="{{ screenshot }}" target="_blank" rel="noopener noreferrer">
-              <img src="{{ screenshot }}" alt="{{ movie.title }} screenshot" loading="lazy">
+              <img src="{{ screenshot|poster:480 }}" alt="{{ movie.title }} screenshot" loading="lazy" decoding="async">
             </a>
             {% endfor %}
           </div>
@@ -269,7 +273,7 @@
       <article class="card" data-movie-id="{{ related.id }}">
         <a class="card__media" href="video_detail.html?id={{ related.id }}">
           {% if related.thumbnail %}
-          <img src="{{ related.thumbnail }}" alt="{{ related.title }}" loading="lazy">
+          <img src="{{ related.thumbnail|poster:300 }}" alt="{{ related.title }}" loading="lazy" width="300" height="450" decoding="async">
           {% else %}
           <div class="card__placeholder" data-glyph="film"></div>
           {% endif %}
@@ -305,8 +309,8 @@
     </div>
     <div>
       <h4>Browse</h4>
-      <a href="browse.html?cat=nollywood-movies">Nollywood</a>
-      <a href="browse.html?cat=hollywood-movies">Hollywood</a>
+      <a href="browse.html?cat=nollywood-movie">Nollywood</a>
+      <a href="browse.html?cat=hollywood-movie">Hollywood</a>
       <a href="browse.html?cat=korean-drama">World Drama</a>
       <a href="browse.html?cat=anime">Anime</a>
     </div>

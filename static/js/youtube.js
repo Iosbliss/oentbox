@@ -56,15 +56,97 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFileSize();
   }
   if (downloadPanel && downloadButton) {
-    downloadButton.addEventListener('click', () => {
+    const progress = document.getElementById('youtubeDownloadProgress');
+    const bar = document.getElementById('youtubeDownloadBar');
+    const statusLabel = document.getElementById('youtubeDownloadStatus');
+    const csrf = () => document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '';
+    const videoTitle = () => document.querySelector('.youtube-detail-copy h1')?.textContent.trim() || 'youtube-video';
+    const EXTENSIONS = { video: 'mp4', video_720: 'mp4', video_480: 'mp4', audio: 'm4a', audio_mp3: 'mp3' };
+
+    const fmtBytes = value => {
+      if (!value) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let size = value; let index = 0;
+      while (size >= 1024 && index < units.length - 1) { size /= 1024; index += 1; }
+      return `${size.toFixed(index ? 1 : 0)} ${units[index]}`;
+    };
+    const fmtTime = value => value == null ? '' : value < 60 ? `${Math.round(value)}s` : `${Math.floor(value / 60)}m ${Math.round(value % 60)}s`;
+
+    const setProgress = percent => { if (bar) bar.style.width = `${Math.min(100, Math.max(0, percent))}%`; };
+    const say = text => { if (statusLabel) statusLabel.textContent = text; };
+
+    const resetButton = label => {
+      downloadButton.disabled = false;
+      downloadButton.removeAttribute('aria-busy');
+      downloadButton.lastChild.textContent = ` ${label}`;
+    };
+
+    const saveFile = (jobId, filename) => {
+      const link = document.createElement('a');
+      link.href = `/api/youtube/download/${encodeURIComponent(jobId)}/file/`;
+      link.download = filename;
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    };
+
+    const poll = (jobId, format) => {
+      const tick = async () => {
+        try {
+          const response = await fetch(`/api/youtube/download/${encodeURIComponent(jobId)}/`, { credentials: 'same-origin' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Download failed.');
+          if (typeof data.progress === 'number') setProgress(data.progress);
+          if (data.status === 'complete') {
+            setProgress(100);
+            say('Saving file to your device…');
+            saveFile(jobId, data.filename || `${videoTitle()}.${EXTENSIONS[format] || 'mp4'}`);
+            say('Saved — check your downloads folder.');
+            resetButton('Download again');
+            return;
+          }
+          if (data.status === 'error' || data.status === 'cancelled') throw new Error(data.detail || 'Download failed.');
+          if (data.status === 'downloading') {
+            const speed = data.speed ? ` · ${fmtBytes(data.speed)}/s` : '';
+            const eta = data.eta ? ` · ${fmtTime(data.eta)} left` : '';
+            say(`${Math.round(data.progress)}%${speed}${eta}`);
+          } else {
+            say(data.detail || 'Preparing download…');
+          }
+          setTimeout(tick, 1500);
+        } catch (error) {
+          say(error.message || 'Download failed.');
+          resetButton('Retry download');
+        }
+      };
+      tick();
+    };
+
+    downloadButton.addEventListener('click', async () => {
+      const format = downloadFormat ? downloadFormat.value : 'video';
       downloadButton.disabled = true;
       downloadButton.setAttribute('aria-busy', 'true');
-      downloadButton.lastChild.textContent = ' Starting...';
-      const managerUrl = new URL('/downloads.html', window.location.origin);
-      managerUrl.searchParams.set('url', downloadPanel.dataset.downloadUrl);
-      managerUrl.searchParams.set('format', downloadFormat.value);
-      managerUrl.searchParams.set('title', document.querySelector('.youtube-detail-copy h1')?.textContent.trim() || 'YouTube video');
-      window.location.href = managerUrl.href;
+      downloadButton.lastChild.textContent = ' Starting…';
+      if (progress) progress.hidden = false;
+      setProgress(0);
+      say('Starting download…');
+      try {
+        const response = await fetch('/api/youtube/download/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+          body: JSON.stringify({ url: downloadPanel.dataset.downloadUrl, format }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not start the download.');
+        say('Preparing download…');
+        poll(data.job_id, format);
+      } catch (error) {
+        say(error.message || 'Could not start the download.');
+        resetButton('Retry download');
+      }
     });
   }
 
@@ -78,9 +160,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadMoreBtn = document.getElementById('youtubeLoadMore');
   if (!form || !results || !status) return;
 
-  const BASE_LIMIT = 50;
-  const STEP = 50;
-  const MAX_LIMIT = 100;
+  const BASE_LIMIT = 12;
+  const STEP = 12;
+  const MAX_LIMIT = 24;
   let currentQuery = '';
   let currentLimit = BASE_LIMIT;
   let isLoading = false;
