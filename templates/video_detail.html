@@ -213,10 +213,11 @@
                 <div class="video-detail__download-label">{{ item.label|default:"Download" }}</div>
                 <div class="video-detail__download-text">{{ item.text }}</div>
               </div>
-              <a href="{{ item.url }}" target="_blank" rel="noopener nofollow" class="btn btn--primary js-download-link" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Download</a>
+              <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer nofollow" class="btn btn--primary js-download-link" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Download</a>
             </div>
             {% endfor %}
           </div>
+          <p class="video-detail__download-hint">You'll open our file host in a new tab. If you see any ads there, they come from the file host — just close them and tap the download button on that page.</p>
         </section>
         {% endif %}
 
@@ -249,7 +250,7 @@
             <div class="video-detail__info-item">
               <div class="video-detail__info-label">{{ key }}</div>
               {% if key == "Imdb" %}
-              <a href="{{ value }}" target="_blank" class="video-detail__info-link">{{ value }}</a>
+              <a href="{{ value }}" target="_blank" rel="noopener noreferrer" class="video-detail__info-link">{{ value }}</a>
               {% else %}
               <div class="video-detail__info-value">{{ value }}</div>
               {% endif %}
