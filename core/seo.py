@@ -46,10 +46,10 @@ def sitemap_chunk(request, chunk):
     """One title sitemap file: static pages plus up to SITEMAP_CHUNK_SIZE titles."""
     if chunk < 1:
         raise Http404("no such sitemap chunk")
-    cache_key = "sitemap:chunk:v1:%d" % chunk
+    base = escape(_base_url(request))
+    cache_key = "sitemap:chunk:v2:%s:%d" % (base, chunk)
     xml = cache.get(cache_key)
     if xml is None:
-        base = escape(_base_url(request))
         start = (chunk - 1) * SITEMAP_CHUNK_SIZE
         rows = (
             Movie.objects.exclude(category__in=EXCLUDED_CATEGORIES)

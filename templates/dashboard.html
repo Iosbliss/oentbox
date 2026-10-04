@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20">
 </head>
 <body data-page="dashboard">
 
@@ -80,6 +80,7 @@
       <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
     </button>
   </div>
+  <div class="search-results" id="searchResults"></div>
   <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
 </div>
 
@@ -307,7 +308,8 @@
     <div>
       <h4>Get updates</h4>
       <form class="footer__form" onsubmit="return false;">
-        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <input type="text" name="website" value="" hidden aria-hidden="true" tabindex="-1" autocomplete="off">
+        <input type="email" placeholder="you@email.com" aria-label="Email address" required>
         <button class="btn btn--primary" type="submit">Join</button>
       </form>
     </div>
@@ -338,8 +340,6 @@
     <span>Saved</span>
   </a>
 </nav>
-
-<script src="{% static 'js/data.js' %}"></script>
 <script src="{% static 'js/common.js' %}"></script>
 {{ dashboard_titles|json_script:"dashboard-data" }}
 {{ dashboard_activity|json_script:"activity-data" }}

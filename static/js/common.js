@@ -44,14 +44,77 @@ document.addEventListener('DOMContentLoaded', () => {
     searchOverlay.setAttribute('aria-label', 'Search titles');
   }
 
+  const searchResults = document.getElementById('searchResults');
+  let liveSearchTimer = null;
+  let liveSearchAbort = null;
+
+  const clearLiveResults = () => {
+    if (!searchResults) return;
+    searchResults.classList.remove('is-open');
+    searchResults.innerHTML = '';
+  };
   const openSearch = () => {
     searchOverlay.classList.add('is-open');
     setTimeout(() => searchInput.focus(), 150);
   };
-  const closeSearch = () => searchOverlay.classList.remove('is-open');
+  const closeSearch = () => {
+    if (!searchOverlay) return;
+    searchOverlay.classList.remove('is-open');
+    clearLiveResults();
+  };
   const submitSearch = () => {
     const q = searchInput.value.trim();
     if (q) window.location.href = `/browse.html?q=${encodeURIComponent(q)}`;
+  };
+
+  const renderLiveResults = (results, query) => {
+    searchResults.innerHTML = '';
+    if (!results.length) {
+      const empty = document.createElement('p');
+      empty.className = 'search-results__empty';
+      empty.textContent = 'No titles matched your search.';
+      searchResults.appendChild(empty);
+    }
+    results.forEach((item) => {
+      const link = document.createElement('a');
+      link.className = 'search-result';
+      link.href = `/video_detail.html?id=${encodeURIComponent(item.id)}`;
+      if (item.thumbnail) {
+        const img = document.createElement('img');
+        img.src = item.thumbnail;
+        img.alt = '';
+        img.loading = 'lazy';
+        link.appendChild(img);
+      }
+      const text = document.createElement('span');
+      text.className = 'search-result__text';
+      const strong = document.createElement('strong');
+      strong.textContent = item.title;
+      const small = document.createElement('small');
+      small.textContent = [item.category, item.year].filter(Boolean).join(' | ') || 'Browse';
+      text.appendChild(strong);
+      text.appendChild(small);
+      link.appendChild(text);
+      searchResults.appendChild(link);
+    });
+    const all = document.createElement('a');
+    all.className = 'search-results__all';
+    all.href = `/browse.html?q=${encodeURIComponent(query)}`;
+    all.textContent = 'See all results';
+    searchResults.appendChild(all);
+    searchResults.classList.add('is-open');
+  };
+
+  const runLiveSearch = () => {
+    if (!searchResults || !searchInput) return;
+    const q = searchInput.value.trim();
+    if (q.length < 2) { clearLiveResults(); return; }
+    if (liveSearchAbort) liveSearchAbort.abort();
+    liveSearchAbort = new AbortController();
+    fetch(`/api/search/?q=${encodeURIComponent(q)}`, { signal: liveSearchAbort.signal })
+      .then((response) => response.json())
+      .then((data) => renderLiveResults(data.results || [], q))
+      .catch(() => { /* aborted or network hiccup */ });
   };
 
   if (searchBtn) {
@@ -60,6 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
     closeSearchBtn?.addEventListener('click', closeSearch);
     searchOverlay?.addEventListener('click', (e) => { if (e.target === searchOverlay) closeSearch(); });
     searchInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitSearch(); });
+    searchInput?.addEventListener('input', () => {
+      window.clearTimeout(liveSearchTimer);
+      liveSearchTimer = window.setTimeout(runLiveSearch, 250);
+    });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSearch(); closeMenu(); } });
 

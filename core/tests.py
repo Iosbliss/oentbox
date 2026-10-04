@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from datetime import timedelta
+import json
 import tempfile
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -7,7 +8,7 @@ from django.utils import timezone
 from bs4 import BeautifulSoup
 from unittest.mock import patch
 
-from .models import ActivityEvent, DownloadJob, Movie, SavedMovie, ScrapeRun
+from .models import ActivityEvent, Movie, NewsletterEmail, SavedMovie, ScrapeRun
 from . import views
 from .management.commands.scrape_movies import Command
 from .movie_data import classify_movie_category, load_movies
@@ -97,10 +98,9 @@ class DashboardTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['movies'], [])
 
-	def test_saved_api_returns_empty_list_for_guests(self):
+	def test_saved_api_requires_authentication(self):
 		response = Client().get(reverse('saved_api'))
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.json(), {'movie_ids': []})
+		self.assertEqual(response.status_code, 401)
 
 	def test_activity_requires_csrf(self):
 		csrf_client = Client(enforce_csrf_checks=True)
@@ -120,69 +120,6 @@ class DashboardTests(TestCase):
 		self.assertEqual(response.context['total_movies'], 1)
 		self.assertEqual(response.context['movies'][0]['id'], 'filter-series')
 
-	def test_download_job_is_private_to_creator(self):
-		job = DownloadJob.objects.create(
-			id='private-job', session_key='owner-session', video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', detail='Preparing download...',
-		)
-		other_client = Client()
-		other_client.session.save()
-		response = other_client.get(reverse('youtube_download_status', args=[job.pk]))
-		self.assertEqual(response.status_code, 404)
-
-	def test_download_status_uses_persisted_progress(self):
-		job = DownloadJob.objects.create(
-			id='progress-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', status='downloading', progress=47,
-			detail='Downloading... 47%', downloaded_bytes=470, total_bytes=1000,
-		)
-		with views.DOWNLOAD_JOBS_LOCK:
-			views.DOWNLOAD_JOBS[job.pk] = {'status': 'starting', 'progress': 0}
-		response = self.client.get(reverse('youtube_download_status', args=[job.pk]))
-		self.assertEqual(response.json()['status'], 'downloading')
-		self.assertEqual(response.json()['progress'], 47)
-
-	def test_download_file_uses_persisted_complete_path_when_memory_is_stale(self):
-		with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as handle:
-			handle.write(b'hello world')
-			path = handle.name
-		job = DownloadJob.objects.create(
-			id='persisted-file-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='audio_mp3', status='complete', progress=100,
-			detail='Download ready.', filename='test-file.mp3', path=path, output_dir=str(__import__('os').path.dirname(path)),
-		)
-		with views.DOWNLOAD_JOBS_LOCK:
-			views.DOWNLOAD_JOBS[job.pk] = {'status': 'starting', 'path': '', 'filename': 'stale.mp3'}
-		response = self.client.get(reverse('youtube_download_file', args=[job.pk]))
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.get('Content-Disposition'), 'attachment; filename="test-file.mp3"')
-		self.assertEqual(response.get('Content-Type'), 'audio/mpeg')
-
-	def test_download_status_reports_actual_completed_file_size(self):
-		with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as handle:
-			handle.write(b'actual file bytes')
-			path = handle.name
-		job = DownloadJob.objects.create(
-			id='actual-size-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='audio_mp3', status='complete', progress=100,
-			detail='Download ready.', filename='actual-file.mp3', path=path,
-			total_bytes=12000000,
-		)
-		response = self.client.get(reverse('youtube_download_status', args=[job.pk]))
-		self.assertEqual(response.json()['total_bytes'], 12000000)
-		self.assertEqual(response.json()['file_size'], len(b'actual file bytes'))
-
-	def test_stale_starting_download_is_expired(self):
-		job = DownloadJob.objects.create(
-			id='stale-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', status='starting', detail='Preparing download...',
-		)
-		DownloadJob.objects.filter(pk=job.pk).update(
-			updated_at=timezone.now() - timedelta(minutes=3),
-		)
-		response = self.client.get(reverse('youtube_download_status', args=[job.pk]))
-		self.assertEqual(response.json()['status'], 'error')
-
 	def test_health_check_reports_database(self):
 		response = self.client.get(reverse('healthz'))
 		self.assertEqual(response.status_code, 200)
@@ -196,10 +133,6 @@ class DashboardTests(TestCase):
 				content_type='application/json',
 			)
 			self.assertEqual(response.status_code, 200)
-
-	def test_download_creation_requires_post_and_csrf(self):
-		response = self.client.get(reverse('youtube_download'), {'url': 'https://www.youtube.com/watch?v=abcdefghijk'})
-		self.assertEqual(response.status_code, 405)
 
 	@override_settings(BEHIND_PROXY=True)
 	def test_youtube_location_uses_forwarded_visitor_ip(self):
@@ -217,45 +150,48 @@ class DashboardTests(TestCase):
 		response = self.client.get(reverse('youtube_publish_date'), {'id': 'invalid'})
 		self.assertEqual(response.status_code, 400)
 
+	def test_youtube_direct_download_rejects_non_youtube_urls(self):
+		response = self.client.get(reverse('youtube_download_direct'), {'url': 'https://evil.example.com/file'})
+		self.assertEqual(response.status_code, 400)
+
+	def test_api_search_suppresses_short_queries(self):
+		response = self.client.get(reverse('api_search'), {'q': 'a'})
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json(), {'results': []})
+
+	def test_youtube_direct_download_rejects_unknown_format(self):
+		response = self.client.get(reverse('youtube_download_direct'), {'url': 'https://www.youtube.com/watch?v=xeEJ9SbzSFA', 'format': 'iso'})
+		self.assertEqual(response.status_code, 400)
+
+
 	@patch('core.views._youtube_location_profile', return_value=('Trending near you', ('music',)))
 	@patch('core.views._youtube_search', return_value=[])
 	def test_youtube_search_clamps_expensive_result_limit(self, search, location):
 		response = Client().get(reverse('youtube_search'), {'q': 'music', 'limit': 100})
 		self.assertEqual(response.status_code, 200)
 		search.assert_called_once_with('music', limit=24)
+	def test_api_search_finds_matching_titles(self):
+		response = self.client.get(reverse('api_search'), {'q': 'nollywood'})
+		self.assertEqual(response.status_code, 200)
 
-	def test_download_pause_persists_control_state(self):
-		job = DownloadJob.objects.create(
-			id='pause-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', status='downloading', output_dir='/tmp/pause-job',
+	def test_newsletter_signup_stores_email(self):
+		response = self.client.post(
+			reverse('newsletter_signup'),
+			json.dumps({'email': 'fan@example.com', 'website': ''}),
+			content_type='application/json',
 		)
-		with views.DOWNLOAD_JOBS_LOCK:
-			views.DOWNLOAD_JOBS['pause-job'] = {'status': 'downloading'}
-		response = self.client.post(reverse('youtube_download_pause', args=[job.pk]))
-		job.refresh_from_db()
-		self.assertEqual(response.json(), {'status': 'pausing'})
-		self.assertEqual(job.status, 'pausing')
-		self.assertTrue(job.stop_requested)
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(NewsletterEmail.objects.filter(email='fan@example.com').exists())
 
-	def test_download_resume_spawns_worker_without_memory_state(self):
-		job = DownloadJob.objects.create(
-			id='resume-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', status='paused', output_dir='/tmp/resume-job',
+	def test_newsletter_signup_rejects_bad_email(self):
+		response = self.client.post(
+			reverse('newsletter_signup'),
+			json.dumps({'email': 'not-an-email', 'website': ''}),
+			content_type='application/json',
 		)
-		with patch('core.views._spawn_download_job') as spawn:
-			response = self.client.post(reverse('youtube_download_resume', args=[job.pk]))
-		job.refresh_from_db()
-		self.assertEqual(response.json(), {'status': 'starting'})
-		self.assertEqual(job.status, 'starting')
-		spawn.assert_called_once_with(job.pk)
+		self.assertEqual(response.status_code, 400)
 
-	def test_download_cancel_works_without_memory_state(self):
-		job = DownloadJob.objects.create(
-			id='cancel-job', user=self.user, video_url='https://www.youtube.com/watch?v=abcdefghijk',
-			download_format='video', status='downloading', output_dir='/tmp/cancel-job',
-		)
-		response = self.client.post(reverse('youtube_download_cancel', args=[job.pk]))
-		job.refresh_from_db()
-		self.assertEqual(response.json(), {'status': 'cancelling'})
-		self.assertTrue(job.cancel_requested)
-		self.assertTrue(job.stop_requested)
+	def test_random_movie_redirects_to_a_title(self):
+		response = self.client.get(reverse('random_movie'))
+		self.assertEqual(response.status_code, 302)
+		self.assertIn('/video_detail.html?id=', response['Location'])

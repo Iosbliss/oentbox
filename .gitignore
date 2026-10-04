@@ -17,3 +17,4 @@ staticfiles/
 *.bak-*
 ops/alert.conf
 scraper/tmp*
+backups/

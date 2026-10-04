@@ -4,18 +4,15 @@
 //  - /api/* and /admin/*            -> never intercepted, always network
 //  - /static/* (css/js/img/fonts)   -> cache-first, revalidated in the background
 //  - everything else (HTML pages)   -> network-first, falling back to cache when offline
-const CACHE_VERSION = 'oentbox-v10';
+const CACHE_VERSION = 'oentbox-v11';
 
 const APP_SHELL = [
   '/',
   '/static/css/styles.css',
   '/static/js/common.js',
   '/static/js/home.js',
-  '/static/js/browse.js',
   '/static/js/saved.js',
   '/static/js/youtube.js',
-  '/static/js/title.js',
-  '/static/js/data.js',
   '/static/manifest.json',
   '/static/img/icon-o.svg',
 ];

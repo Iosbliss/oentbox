@@ -43,6 +43,18 @@ FETCH_TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (compatible; oentbox-image-cache/1.0; +https://oentbox.com)"
 
 
+class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects that leave the poster-host allowlist (SSRF guard)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_allowed_url(newurl):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_GuardedRedirectHandler())
+
+
 def is_allowed_url(url):
     """True only for http(s) URLs on a poster host we are allowed to fetch."""
     try:
@@ -125,9 +137,9 @@ def ensure_cached(url, width=DEFAULT_WIDTH):
         request = urllib.request.Request(
             url, headers={"User-Agent": USER_AGENT, "Accept": "image/*,*/*;q=0.8"}
         )
-        with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
+        with _OPENER.open(request, timeout=FETCH_TIMEOUT) as response:
             content_type = (response.headers.get("Content-Type") or "").lower()
-            if content_type and not content_type.startswith("image/"):
+            if content_type and content_type.startswith("text/"):
                 return ""
             data = response.read(MAX_BYTES + 1)
     except Exception:
@@ -167,8 +179,7 @@ def image_proxy(request):
     """Optimise one remote poster, then redirect the client to the cached file."""
     remote = request.GET.get("u", "")
     if not is_allowed_url(remote):
-        # never serve arbitrary URLs, and never leave a broken image behind
-        return HttpResponseRedirect(remote if remote.startswith("http") else PLACEHOLDER)
+        return HttpResponseRedirect(PLACEHOLDER)
     name = ensure_cached(remote, request.GET.get("w", DEFAULT_WIDTH))
     if not name:
         return HttpResponseRedirect(remote)

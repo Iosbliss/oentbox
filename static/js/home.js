@@ -1,22 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ---------- Populate rows from shared dataset ---------- */
-  const rowConfigs = [
-    { headingId: 'row-trending', items: NW_TITLES.filter(t => t.featured).slice(0, 8) },
-    { headingId: 'row-new', items: NW_TITLES.filter(t => t.badge === 'NEW').slice(0, 8) },
-    { headingId: 'row-drama', items: nwTitlesByGroup('World Drama').slice(0, 8) },
-  ];
-
-  rowConfigs.forEach(({ headingId, items }) => {
-    const heading = document.getElementById(headingId);
-    if (!heading) return;
-    const track = heading.closest('.row').querySelector('.row__track');
-    track.innerHTML = items.map(nwCardHTML).join('');
-  });
-
   /* ---------- Hero carousel ---------- */
   const heroTrack = document.getElementById('heroTrack');
   const heroDots = document.getElementById('heroDots');
+  if (!heroTrack || !heroDots) return;
   const slides = Array.from(heroTrack.children);
 
   slides.forEach((_, i) => {

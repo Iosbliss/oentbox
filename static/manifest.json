@@ -29,11 +29,6 @@
       "short_name": "YouTube",
       "url": "/youtube.html",
       "icons": [{ "src": "img/icon-o.svg", "sizes": "192x192", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "Downloads",
-      "short_name": "Downloads",
-      "icons": [{ "src": "img/icon-o.svg", "sizes": "192x192", "type": "image/svg+xml" }]
     }
   ]
 }

@@ -18,10 +18,12 @@
 <meta name="twitter:title" content="oentbox — Entertainment, Reimagined">
 <meta name="twitter:description" content="A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"oentbox","url":"https://oentbox.com/","description":"A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.","potentialAction":{"@type":"SearchAction","target":"https://oentbox.com/browse.html?cat=all&q={search_term_string}","query-input":"required name=search_term_string"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"oentbox","url":"https://oentbox.com/","logo":"https://oentbox.com/static/img/icon-o.svg","description":"Nigerian entertainment discovery hub for Nollywood, Hollywood, Bollywood and World Drama movies and TV series."}</script>
+<meta name="application-name" content="oentbox">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20">
 <link rel="manifest" href="{% static 'manifest.json' %}">
 <meta name="theme-color" content="#0B0D10">
 <link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}">
@@ -98,6 +100,7 @@
       <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
     </button>
   </div>
+  <div class="search-results" id="searchResults"></div>
   <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
 </div>
 
@@ -124,6 +127,7 @@
 <div class="scrim" id="scrim"></div>
 
 <main>
+  <h1 class="sr-only">oentbox — Entertainment, Reimagined: Nollywood, Hollywood, Bollywood and World Drama movies and TV series</h1>
 
   <!-- ===== Hero carousel with Scraped Movies ===== -->
   <section class="hero" aria-label="Featured titles">
@@ -137,11 +141,11 @@
           </div>
           <div class="hero__copy">
             <span class="tag {% if forloop.first %}tag--new{% endif %}">{{ movie.category|default:"Movie"|title }}</span>
-            <h1>{{ movie.title|truncatechars:50 }}</h1>
+            <h2>{{ movie.title|truncatechars:50 }}</h2>
             <p>{{ movie.description|truncatechars:150|default:"A great movie from 9jarocks collection." }}</p>
             <div class="hero__cta">
               <a class="btn btn--primary" href="video_detail.html?id={{ movie.id }}">Watch now</a>
-              <button class="btn btn--ghost" data-movie-id="{{ movie.id }}">+ My list</button>
+              <button class="btn btn--ghost js-my-list-button" type="button" data-movie-id="{{ movie.id }}">+ My list</button>
             </div>
           </div>
         </article>
@@ -152,7 +156,7 @@
           <div class="hero__art" data-glyph="film"></div>
           <div class="hero__copy">
             <span class="tag tag--new">New this week</span>
-            <h1>Welcome to oentbox</h1>
+            <h2>Welcome to oentbox</h2>
             <p>Discover the latest movies and TV shows from around the world. Run the scraper to get started!</p>
             <div class="hero__cta">
               <a class="btn btn--primary" href="browse.html">Browse</a>
@@ -399,7 +403,8 @@
     <div>
       <h4>Get updates</h4>
       <form class="footer__form" onsubmit="return false;">
-        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <input type="text" name="website" value="" hidden aria-hidden="true" tabindex="-1" autocomplete="off">
+        <input type="email" placeholder="you@email.com" aria-label="Email address" required>
         <button class="btn btn--primary" type="submit">Join</button>
       </form>
     </div>
@@ -430,9 +435,7 @@
     <span>Saved</span>
   </a>
 </nav>
-
-<script src="{% static 'js/data.js' %}"></script>
-<script src="{% static 'js/common.js' %}?v=2"></script>
+<script src="{% static 'js/common.js' %}?v=4"></script>
 <script src="{% static 'js/home.js' %}"></script>
 </body>
 </html>

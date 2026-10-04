@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20">
 <link rel="manifest" href="{% static 'manifest.json' %}">
 <meta name="theme-color" content="#0B0D10">
 <link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}">
@@ -87,6 +87,7 @@
       <svg viewBox="0 0 24 24" width="20" height="20"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 5l14 14M19 5L5 19"/></svg>
     </button>
   </div>
+  <div class="search-results" id="searchResults"></div>
   <div class="search-overlay__hint">Try “Nollywood 2026”, “Korean drama” or “anime”</div>
 </div>
 
@@ -113,10 +114,7 @@
 
 <main class="youtube-page">
   <section class="youtube-intro">
-    <p class="youtube-kicker">N / WATCH OUTSIDE THE CATALOG</p>
     <h1>Find your next video.</h1>
-    <p>Explore a fresh mix from YouTube, search by topic, and download videos you have permission to keep.</p>
-    <p class="youtube-seo-copy">Browse music, entertainment, news, tutorials and trending videos from YouTube. Search for a topic to find relevant videos, compare popular results and continue watching on YouTube.</p>
   </section>
 
   <form class="youtube-search" id="youtubeSearchForm">
@@ -135,30 +133,16 @@
     {% endfor %}
   </div>
 
-  <section class="youtube-topics" aria-labelledby="youtube-topics-title">
-    <p class="youtube-kicker">EXPLORE TOPICS</p>
-    <h2 id="youtube-topics-title">Popular YouTube video searches</h2>
-    <p>Explore popular video topics on oentbox, from music and entertainment to tutorials, news and trending videos.</p>
-    <nav aria-label="Popular YouTube topics">
-      <a href="/youtube.html?topic=music">Music videos</a>
-      <a href="/youtube.html?topic=entertainment">Entertainment</a>
-      <a href="/youtube.html?topic=news">News videos</a>
-      <a href="/youtube.html?topic=tutorials">Tutorials</a>
-      <a href="/youtube.html?topic=trending">Trending videos</a>
-    </nav>
-  </section>
-
   <noscript>
     <p class="youtube-status">Enable JavaScript to search and browse YouTube videos on oentbox.</p>
   </noscript>
-
-  <p class="youtube-notice">Downloads are provided for videos you own or are licensed to save. YouTube's terms and the creator's rights still apply.</p>
 
   <div class="youtube-status" id="youtubeStatus" role="status" aria-live="polite">Loading a random mix...</div>
   <section class="youtube-grid" id="youtubeResults" aria-live="polite"></section>
   <div class="youtube-loadmore" id="youtubeLoadMoreWrap" hidden>
     <button class="btn btn--ghost" id="youtubeLoadMore" type="button">Show more videos</button>
   </div>
+  <p class="youtube-notice">Downloads are provided for videos you own or are licensed to save. YouTube's terms and the creator's rights still apply.</p>
 </main>
 
 <footer class="footer">
@@ -186,7 +170,8 @@
     <div>
       <h4>Get updates</h4>
       <form class="footer__form" onsubmit="return false;">
-        <input type="email" placeholder="you@email.com" aria-label="Email address">
+        <input type="text" name="website" value="" hidden aria-hidden="true" tabindex="-1" autocomplete="off">
+        <input type="email" placeholder="you@email.com" aria-label="Email address" required>
         <button class="btn btn--primary" type="submit">Join</button>
       </form>
     </div>
@@ -217,7 +202,7 @@
   </a>
 </nav>
 
-<script src="{% static 'js/common.js' %}?v=2"></script>
-<script src="{% static 'js/youtube.js' %}?v=11"></script>
+<script src="{% static 'js/common.js' %}?v=4"></script>
+<script src="{% static 'js/youtube.js' %}?v=17"></script>
 </body>
 </html>

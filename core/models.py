@@ -91,36 +91,12 @@ class ScrapeRun(models.Model):
 		ordering = ('-started_at',)
 
 
-class DownloadJob(models.Model):
-	STATUS_CHOICES = (
-		('starting', 'Starting'),
-		('downloading', 'Downloading'),
-		('pausing', 'Pausing'),
-		('paused', 'Paused'),
-		('cancelling', 'Cancelling'),
-		('complete', 'Complete'),
-		('error', 'Error'),
-	)
-
-	id = models.CharField(max_length=64, primary_key=True)
-	user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
-	session_key = models.CharField(max_length=40, blank=True, db_index=True)
-	video_url = models.URLField(max_length=500)
-	download_format = models.CharField(max_length=30)
-	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='starting')
-	progress = models.PositiveSmallIntegerField(default=0)
-	downloaded_bytes = models.BigIntegerField(default=0)
-	total_bytes = models.BigIntegerField(default=0)
-	speed = models.FloatField(default=0)
-	eta = models.FloatField(null=True, blank=True)
-	detail = models.CharField(max_length=255, blank=True)
-	filename = models.CharField(max_length=255, blank=True)
-	path = models.CharField(max_length=500, blank=True)
-	output_dir = models.CharField(max_length=500, blank=True)
-	stop_requested = models.BooleanField(default=False)
-	cancel_requested = models.BooleanField(default=False)
+class NewsletterEmail(models.Model):
+	email = models.EmailField(unique=True)
 	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
 		ordering = ('-created_at',)
+
+	def __str__(self):
+		return self.email
