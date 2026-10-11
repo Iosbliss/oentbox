@@ -1394,9 +1394,13 @@ def _json_ld(payload):
             .replace('&', '\\u0026'))
 
 
-def title_detail(request):
-    """Movie detail page"""
-    movie_id = request.GET.get('id')
+def title_detail(request, slug=None):
+    """Movie detail page
+
+    Accepts either ?id=<movie_id> (legacy query form) or /m/<slug> (clean URL).
+    The slug IS the movie id, just in the path instead of the query string.
+    """
+    movie_id = request.GET.get('id') or slug
     
     if movie_id:
         movie = get_movie_by_id(movie_id)
@@ -1410,7 +1414,7 @@ def title_detail(request):
                 'movie': movie,
                 'related_movies': related,
                 'has_movie': True,
-                'canonical_url': request.build_absolute_uri(f'/video_detail.html?id={quote(movie_id)}'),
+                'canonical_url': request.build_absolute_uri(f'/m/{quote(movie_id)}'),
                 'seo_json': _json_ld(build_movie_schema(movie, request)),
             }
             get_token(request)
