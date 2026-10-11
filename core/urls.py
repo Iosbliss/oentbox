@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from . import imageproxy, seo, views
 
@@ -21,6 +21,13 @@ urlpatterns = [
     path("saved.html", views.saved, name="saved"),
     path("video_detail.html", views.title_detail, name="video_detail"),
     path("title.html", views.title_detail, name="title"),
+
+    # SEO-friendly clean URLs for individual titles.
+    # /m/<slug> is the canonical form; the old ?id= query route is kept for
+    # backward compatibility and 301-redirects to the clean URL.
+    re_path(r"^m/(?P<slug>[^/]+)/?$", views.title_detail, name="title_clean"),
+    re_path(r"^movie/(?P<slug>[^/]+)/?$", views.title_detail, name="title_clean2"),
+
     path("api/search/", views.api_search, name="api_search"),
     path("api/newsletter/", views.newsletter_signup, name="newsletter_signup"),
     path("api/track-activity/", views.track_activity, name="track_activity"),

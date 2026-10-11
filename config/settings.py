@@ -59,6 +59,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.VisitTrackingMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -73,10 +74,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "templates.context_processors.analytics.google_analytics",
             ],
         },
     },
 ]
+
+# Google Analytics 4 measurement ID (e.g. G-XXXXXXXXXX). Empty disables the
+# snippet everywhere; set DJANGO_GOOGLE_ANALYTICS_ID in the server .env.
+GOOGLE_ANALYTICS_ID = os.environ.get('DJANGO_GOOGLE_ANALYTICS_ID', '')
 
 WSGI_APPLICATION = "config.wsgi.application"
 
@@ -138,6 +144,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
+LOGIN_REDIRECT_URL = "/dashboard/"
+LOGOUT_REDIRECT_URL = "/"
 
 TIME_ZONE = "UTC"
 

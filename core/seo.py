@@ -17,11 +17,16 @@ from .movie_data import EXCLUDED_CATEGORIES
 SITEMAP_CHUNK_SIZE = 5000
 SITEMAP_CACHE_TTL = 3600
 SITEMAP_MAX_AGE = 3600
-STATIC_PATHS = ("/", "/about.html", "/browse.html?cat=all", "/youtube.html")
+STATIC_PATHS = ("/", "/about.html", "/privacy.html", "/terms.html", "/browse.html?cat=all", "/youtube.html")
 
 
 def _base_url(request):
     return request.build_absolute_uri("/").rstrip("/")
+
+
+def _clean_url(movie_id):
+    """Build the SEO-friendly canonical URL for a movie."""
+    return "/m/" + str(quote(str(movie_id), safe=""))
 
 
 def sitemap_index(request):
@@ -66,8 +71,8 @@ def sitemap_chunk(request, chunk):
             if row["scraped_at"]:
                 lastmod = "<lastmod>%s</lastmod>" % row["scraped_at"].date().isoformat()
             urls.append(
-                '<url><loc>%s/video_detail.html?id=%s</loc>%s</url>'
-                % (base, escape(quote(str(row["id"]), safe="")), lastmod)
+                '<url><loc>%s%s</loc>%s</url>'
+                % (base, escape(_clean_url(row["id"])), lastmod)
             )
         if not urls:
             raise Http404("sitemap chunk is empty")
@@ -97,7 +102,8 @@ def build_movie_schema(movie, request=None):
         "name": title,
     }
     if request is not None:
-        schema["url"] = request.build_absolute_uri()
+        movie_id = quote(str(movie.get("id", "")), safe="")
+        schema["url"] = request.build_absolute_uri(_clean_url(movie_id))
     description = (movie.get("description") or "").strip()
     if description:
         schema["description"] = description[:500]
@@ -113,7 +119,76 @@ def build_movie_schema(movie, request=None):
         schema["dateCreated"] = str(year)
     if category:
         schema["genre"] = category.replace("-", " ").title()
-    trailer = movie.get("trailer_embed_url") or movie.get("trailer_url")
+
+    trailer = None
+    if movie.get("trailer_embed_url"):
+        # Extract YouTube video ID from embed URL for richer VideoObject schema
+        trailer = movie["trailer_embed_url"]
+    elif movie.get("trailer_url"):
+        trailer = movie["video_url"] if movie.get("video_url") else movie.get("trailer_url")
     if trailer:
-        schema["trailer"] = {"@type": "VideoObject", "url": trailer}
+        schema["trailer"] = {"@type": "VideoObject", "url": trailer, "name": title + " Trailer"}
+
+    if movie.get("imdb_id"):
+        schema["sameAs"] = "https://www.imdb.com/title/" + movie["imdb_id"]
+    return schema
+
+
+def build_breadcrumbs(movie, request=None, category=None):
+    """Build breadcrumb schema.org data for a title detail page."""
+    if not movie:
+        return {}
+    base = request.build_absolute_uri("/").rstrip("/") if request else "https://oentbox.com"
+    movie_id = quote(str(movie.get("id", "")), safe="")
+    items = [
+        {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": base + "/",
+        },
+    ]
+    if category:
+        items.append({
+            "@type": "ListItem",
+            "position": 2,
+            "name": category.replace("-", " ").title(),
+            "item": base + "/browse.html?cat=" + category,
+        })
+        items.append({
+            "@type": "ListItem",
+            "position": 3,
+            "name": str(movie.get("title", "")),
+            "item": base + _clean_url(movie_id),
+        })
+    else:
+        items.append({
+            "@type": "ListItem",
+            "position": 2,
+            "name": str(movie.get("title", "")),
+            "item": base + _clean_url(movie_id),
+        })
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": items,
+    }
+
+
+def build_collection_page_schema(category_label, category_slug, total_movies, request=None):
+    """schema.org CollectionPage data for browse pages."""
+    base = request.build_absolute_uri("/").rstrip("/") if request else "https://oentbox.com"
+    url = base + "/browse.html?cat=" + category_slug if category_slug != "all" else base + "/browse.html?cat=all"
+    schema = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": category_label,
+        "description": "Browse " + category_label + " on oentbox. Stream and discover Nollywood, Hollywood, Bollywood, K-drama, and world series.",
+        "url": url,
+    }
+    if total_movies:
+        schema["about"] = {
+            "@type": "ItemList",
+            "numberOfItems": total_movies,
+        }
     return schema

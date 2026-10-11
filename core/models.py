@@ -100,3 +100,21 @@ class NewsletterEmail(models.Model):
 
 	def __str__(self):
 		return self.email
+
+
+class Visit(models.Model):
+	path = models.CharField(max_length=500, db_index=True)
+	ip_address = models.GenericIPAddressField(db_index=True)
+	user_agent = models.TextField(blank=True)
+	referer = models.CharField(max_length=500, blank=True)
+	is_bot = models.BooleanField(default=False, db_index=True)
+	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+	class Meta:
+		ordering = ('-created_at',)
+		indexes = [
+			models.Index(fields=('path', '-created_at'), name='core_visit_7a2b1c_idx'),
+		]
+
+	def __str__(self):
+		return f'{self.path} @ {self.created_at}'

@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
       filterType.innerHTML = '<option value="all">All types</option>' + Object.keys(typeCounts).sort().map(type => `<option value="${type}">${type}</option>`).join('');
       renderTable();
       renderHistory(snapshot.history);
+      renderVisitorStats(snapshot.visitor_stats);
       const status = snapshot.scraper || {};
       scrapeProgress.hidden = !status.running;
       if (status.running) {
@@ -283,6 +284,59 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       // Keep the last successful dashboard snapshot visible during transient failures.
     }
+  }
+
+  function renderVisitorStats(stats) {
+    const summary = document.getElementById('visitorSummary');
+    const trendList = document.getElementById('visitorTrend');
+    const qualityList = document.getElementById('visitorQuality');
+    const referrerList = document.getElementById('visitorReferrers');
+    const barlist = document.getElementById('visitorTopPages');
+    const updated = document.getElementById('visitorUpdated');
+    if (!summary) return;
+    const totalEl = summary.querySelector(':scope > div:nth-child(1) strong');
+    const uniqueEl = summary.querySelector(':scope > div:nth-child(2) strong');
+    const todayEl = summary.querySelector(':scope > div:nth-child(3) strong');
+    if (totalEl) totalEl.textContent = fmt(stats?.total_visits || 0);
+    if (uniqueEl) uniqueEl.textContent = fmt(stats?.unique_visitors || 0);
+    if (todayEl) todayEl.textContent = fmt(stats?.visits_today || 0);
+    if (qualityList) {
+      const human = stats?.human_visits || 0;
+      const bot = stats?.bot_visits || 0;
+      const maxQuality = Math.max(human, bot) || 1;
+      qualityList.innerHTML = (
+        '<div class="barlist__head"><strong>Traffic quality (bots vs humans)</strong></div>'
+        + `<div class="barlist__row"><span class="barlist__label">Humans</span><div class="barlist__track"><div class="barlist__fill" style="width:${(human / maxQuality * 100).toFixed(0)}%"></div></div><span class="barlist__value">${fmt(human)}</span></div>`
+        + `<div class="barlist__row"><span class="barlist__label">Bots / automation</span><div class="barlist__track"><div class="barlist__fill" style="width:${(bot / maxQuality * 100).toFixed(0)}%"></div></div><span class="barlist__value">${fmt(bot)}</span></div>`
+      );
+    }
+    if (referrerList) {
+      const referrers = stats?.top_referrers || [];
+      const maxRef = referrers.reduce((max, item) => Math.max(max, item.view_count), 0) || 1;
+      const refRows = referrers.map(item => `<div class="barlist__row"><span class="barlist__label">${escapeHtml(item.source)}</span><div class="barlist__track"><div class="barlist__fill" style="width:${(item.view_count / maxRef * 100).toFixed(0)}%"></div></div><span class="barlist__value">${fmt(item.view_count)}</span></div>`);
+      referrerList.hidden = !refRows.length;
+      referrerList.innerHTML = (
+        '<div class="barlist__head"><strong>Where visitors come from</strong></div>'
+        + (refRows.join('') || '<p class="panel__sub">No referrer data yet.</p>')
+      );
+    }
+    if (trendList && stats?.visits_last_7_days) {
+      const maxTrend = stats.visits_last_7_days.reduce((max, item) => Math.max(max, item.count), 0) || 1;
+      const trendRows = stats.visits_last_7_days.map(item => `<div class="barlist__row"><span class="barlist__label">${escapeHtml(item.date)}</span><div class="barlist__track"><div class="barlist__fill" style="width:${(item.count / maxTrend * 100).toFixed(0)}%"></div></div><span class="barlist__value">${fmt(item.count)}</span></div>`);
+      const head = trendList.querySelector('.barlist__head');
+      trendList.innerHTML = '';
+      if (head) trendList.appendChild(head);
+      trendList.insertAdjacentHTML('beforeend', trendRows.join('') || '<p class="panel__sub">No visits recorded yet.</p>');
+    }
+    if (barlist && stats?.top_paths) {
+      const maxCount = stats.top_paths.reduce((max, item) => Math.max(max, item.view_count), 0) || 1;
+      const rows = stats.top_paths.map(item => `<div class="barlist__row"><span class="barlist__label">${escapeHtml(item.path)}</span><div class="barlist__track"><div class="barlist__fill" style="width:${(item.view_count / maxCount * 100).toFixed(0)}%"></div></div><span class="barlist__value">${fmt(item.view_count)}</span></div>`);
+      const head = barlist.querySelector('.barlist__head');
+      barlist.innerHTML = '';
+      if (head) barlist.appendChild(head);
+      barlist.insertAdjacentHTML('beforeend', rows.join('') || '<p class="panel__sub">No visits recorded yet.</p>');
+    }
+    if (updated) updated.textContent = `Updated ${new Date().toLocaleTimeString()}`;
   }
 
   renderHistory({total_runs: 0, completed_runs: 0, failed_runs: 0, average_new_titles: 0, catalog_days: 0, average_titles_per_day: 0, runs: [], catalog_history: []});

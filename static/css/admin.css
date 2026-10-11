@@ -1,0 +1,654 @@
+﻿/* ===================================================================
+   oentbox - Admin theme overrides
+   Dark theme for Django admin that matches the site design.
+   Overrides Django's CSS custom properties with oentbox values.
+   The <script> in base_site.html sets data-theme="dark" by default.
+=================================================================== */
+
+/* ---- Override Django admin CSS variables with oentbox dark theme ---- */
+:root {
+  --primary: #E8A33D;          /* amber instead of blue */
+  --secondary: #2FB6A3;         /* teal */
+  --accent: #E8A33D;
+  --primary-fg: #fff;
+
+  --body-fg: #F3F1EC;
+  --body-bg: #0B0D10;
+  --body-quiet-color: #676D77;
+  --body-medium-color: #9BA0A8;
+  --body-loud-color: #F3F1EC;
+
+  --header-color: #14171C;
+  --header-branding-color: #E8A33D;
+  --header-bg: #14171C;
+  --header-link-color: #F3F1EC;
+
+  --breadcrumbs-fg: #9BA0A8;
+  --breadcrumbs-link-fg: #E8A33D;
+  --breadcrumbs-bg: #1D2129;
+
+  --link-fg: #E8A33D;
+  --link-hover-color: #F4C77A;
+  --link-selected-fg: #2FB6A3;
+
+  --hairline-color: #262B33;
+  --border-color: #262B33;
+
+  --error-fg: #E85D4B;
+
+  --message-debug-bg: #2a2a2a;
+  --message-info-bg: #264b5d;
+  --message-success-bg: #006b1b;
+  --message-warning-bg: #583305;
+  --message-error-bg: #570808;
+
+  --darkened-bg: #1D2129;
+  --selected-bg: #262B34;
+  --selected-row: #262B34;
+
+  --button-fg: #1A1103;
+  --button-bg: #E8A33D;
+  --button-hover-bg: #F4C77A;
+  --default-button-bg: #2FB6A3;
+  --default-button-hover-bg: #3ecdb1;
+  --close-button-bg: #262B34;
+  --close-button-hover-bg: #3a3f49;
+  --delete-button-bg: #E85D4B;
+  --delete-button-hover-bg: #f06a5a;
+
+  --object-tools-fg: #fff;
+  --object-tools-bg: #262B34;
+  --object-tools-hover-bg: #2A1B03;
+
+  --font-family-primary:
+    'Inter', system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-family-monospace:
+    ui-monospace, Menlo, Monaco, 'Cascadia Mono', 'Segoe UI Mono',
+    'Roboto Mono', 'Oxygen Mono', 'Ubuntu Monospace', 'Source Code Pro',
+    'Fira Mono', 'Droid Sans Mono', 'Courier New', monospace,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  color-scheme: dark;
+
+  /* ---- oentbox-specific convenience aliases ---- */
+  --text: #F3F1EC;
+  --text-dim: #9BA0A8;
+  --text-faint: #676D77;
+  --text-strong: #F3F1EC;
+
+  --bg: #0B0D10;
+  --bg-elev: #14171C;
+  --bg-elev-2: #1D2129;
+  --bg-elev-3: #262B33;
+
+  --line: #262B33;
+  --hairline: #262B33;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  --accent-2: #2FB6A3;      /* teal for "view" actions */
+  --accent-ink: #1A1103;
+
+  --font-body: var(--font-family-primary);
+}
+
+/* ---- Layout tweaks ---- */
+body.admin-theme {
+  font-family: var(--font-family-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+#container {
+  min-width: 100%;
+  max-width: 100%;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+#header {
+  background: color-mix(in srgb, var(--bg-elev, #14171C) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 0 24px;
+  height: 60px;
+}
+@media (min-width: 900px) {
+  #header { padding: 0 40px; }
+}
+
+#header h1 {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-weight: 700;
+  font-size: 24px;
+}
+#header h1 a, #header h1 a:visited {
+  color: var(--text, #F3F1EC);
+}
+#header h1 a:hover {
+  color: var(--accent, #E8A33D);
+}
+
+#branding {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+#site-name {
+  padding: 0;
+  margin: 0;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--header-branding-color);
+}
+#site-name a, #site-name a:link, #site-name a:visited {
+  color: var(--header-branding-color);
+  text-decoration: none;
+}
+#site-name a:hover {
+  color: var(--accent);
+}
+
+#user-tools {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+#user-tools a, #user-tools a:visited {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+#user-tools a:hover {
+  color: var(--accent);
+}
+#logout-form button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all .15s ease;
+}
+#logout-form button:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Custom brand (replaces the site-name link) */
+.brand__mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), #F4C77A);
+  color: var(--accent-ink);
+  display: inline-grid;
+  place-items: center;
+  font-family: 'Space Grotesk', var(--font-body);
+  font-weight: 700;
+  font-size: 16px;
+}
+.brand__name {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -.02em;
+}
+.brand__name em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.dashboard-link {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+  transition: all .15s ease;
+  flex: 0 0 auto;
+}
+.dashboard-link:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+/* Sidebar (nav) */
+#nav-sidebar {
+  background: var(--bg-elev);
+  border-right: 1px solid var(--line);
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+}
+#nav-sidebar h3 {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-faint);
+  margin: 14px 16px 6px;
+  padding: 0;
+}
+#nav-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#nav-sidebar li {
+  margin: 2px 0;
+}
+#nav-sidebar a {
+  display: block;
+  padding: 9px 14px;
+  margin: 2px 6px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+#nav-sidebar a:hover {
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border-left: 3px solid var(--accent);
+}
+#nav-sidebar a.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+  font-weight: 600;
+}
+
+/* Content area */
+.content {
+  padding: 20px 24px;
+}
+@media (max-width: 760px) {
+  .content { padding: 16px; }
+}
+
+.content h1 {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+  margin-top: 0;
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: var(--text-faint);
+}
+.breadcrumbs a {
+  color: var(--text-dim);
+}
+.breadcrumbs a:hover {
+  color: var(--accent);
+}
+
+/* Buttons - modern rounded style */
+input[type="submit"],
+button[type="submit"],
+.button,
+a.button {
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  border: 1px solid var(--line);
+  transition: transform .15s ease, background .15s ease;
+}
+input[type="submit"]:hover,
+button[type="submit"]:hover,
+.button:hover,
+a.button:hover {
+  transform: translateY(-1px);
+}
+input[type="submit"]:active,
+button[type="submit"]:active,
+.button:active,
+a.button:active {
+  transform: scale(.97);
+}
+
+/* Tables */
+table {
+  font-size: 13.5px;
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+table th {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--line);
+}
+table td {
+  color: var(--text-dim);
+}
+table tr:hover td {
+  background: var(--bg-elev-2);
+}
+
+/* Module boxes */
+.module {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.module h2 {
+  background: transparent;
+  color: var(--text);
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: 17px;
+  font-weight: 700;
+  padding: 0;
+  margin: 0 0 14px;
+  border: none;
+}
+.module h3 {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Dashboard index cards */
+.dashboard .module {
+  transition: border-color .15s ease, transform .15s ease;
+}
+.dashboard .module:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* App list module - modern card style */
+.dashboard .module {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.dashboard .module table {
+  width: 100%;
+  border-collapse: collapse;
+  background: transparent;
+  margin-bottom: 0;
+}
+.dashboard .module caption {
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  padding: 0 0 12px;
+  margin: 0;
+}
+.dashboard .module a.section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 4px 0;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all .15s ease;
+  border-left: 3px solid transparent;
+}
+.dashboard .module a.section:hover {
+  background: var(--bg-elev-2);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+/* Model rows in app tables */
+.dashboard .module tr {
+  border-bottom: 1px solid var(--line);
+}
+.dashboard .module tr:last-child {
+  border-bottom: none;
+}
+.dashboard .module th[scope="row"] {
+  font-weight: 500;
+  padding: 8px 12px;
+}
+.dashboard .module th[scope="row"] a {
+  color: var(--text);
+  text-decoration: none;
+}
+.dashboard .module th[scope="row"] a:hover {
+  color: var(--accent);
+}
+
+/* Action links (add, change, view) */
+.dashboard .module a.addlink,
+.dashboard .module a.changelink,
+.dashboard .module a.viewlink,
+.dashboard .module a.deletelink {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all .15s ease;
+}
+.dashboard .module a.addlink {
+  background: color-mix(in srgb, var(--accent-2) 20%, var(--bg-elev-3));
+  color: var(--accent-2);
+}
+.dashboard .module a.addlink:hover {
+  background: var(--accent-2);
+  color: #000;
+}
+.dashboard .module a.changelink {
+  background: color-mix(in srgb, var(--accent) 20%, var(--bg-elev-3));
+  color: var(--accent);
+}
+.dashboard .module a.changelink:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.dashboard .module a.viewlink {
+  background: color-mix(in srgb, var(--accent-2) 20%, var(--bg-elev-3));
+  color: var(--accent-2);
+}
+.dashboard .module a.viewlink:hover {
+  background: var(--accent-2);
+  color: #000;
+}
+
+/* Recent actions */
+.actionlist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.actionlist li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.actionlist li:last-child {
+  border-bottom: none;
+}
+.actionlist .mini {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* Form inputs */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="url"],
+textarea,
+select {
+  padding: 11px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-s);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: border-color .15s ease, background .15s ease;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+  background: var(--body-bg);
+}
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Paginator */
+.paginator {
+  border-top: 1px solid var(--hairline-color);
+  padding-top: 14px;
+}
+.paginator a {
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+.paginator a[aria-current="page"],
+.paginator a.this-page {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* Messages */
+ul.messagelist li {
+  border-radius: var(--radius-s);
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+/* Error display */
+.errornote {
+  background: color-mix(in srgb, var(--error-fg) 16%, transparent);
+  border: 1px solid var(--error-fg);
+  border-radius: var(--radius-s);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #fff;
+}
+
+/* Widget overrides */
+select {
+  height: auto;
+  padding: 11px 14px;
+}
+
+/* Changelist specific */
+#changelist {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  padding: 20px;
+}
+#changelist .results {
+  margin: 0;
+}
+#changelist .module {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Changelist filter sidebar */
+#content-related {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 20px;
+  margin-top: 0;
+}
+#content-related .module {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+#content-related h3 {
+  color: var(--text);
+  font-family: 'Space Grotesk', var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 0 10px;
+  margin: 0 0 14px;
+}
+
+/* Search box in changelist */
+.search-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.search-form input[type="text"] {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-s);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+.search-form input[type="submit"] {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.search-form input[type="submit"]:hover {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+}
+
+/* Filter form in sidebar */
+#content-related form {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+#content-related .submit-row {
+  padding: 12px 0 0;
+}
+#content-related button[type="submit"] {
+  width: 100%;
+}

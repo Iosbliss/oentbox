@@ -20,7 +20,7 @@
 {% endif %}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}?v=23">
 <link rel="manifest" href="{% static 'manifest.json' %}">
 <meta name="theme-color" content="#0B0D10">
 <link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}">
@@ -28,6 +28,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="oentbox">
+{% include "_analytics.html" %}
 </head>
 <body data-page="title">
 
@@ -144,22 +145,34 @@
         </div>
         {% endif %}
         <div class="detail-actions video-detail__actions">
-        <a href="{{ movie.link }}" class="btn btn--primary video-detail__cta" target="_blank" rel="noopener noreferrer">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          Watch Now
-        </a>
-        <button class="btn btn--ghost js-my-list-button" type="button" data-movie-id="{{ movie.id }}">+ My list</button>
-        <button
-          class="btn btn--ghost"
-          type="button"
-          onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href = 'browse.html?cat=all'; }"
-        >← Back</button>
+          <button class="btn btn--primary video-detail__cta js-my-list-button" type="button" data-movie-id="{{ movie.id }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            <span class="video-detail__cta-label js-my-list-label">+ My list</span>
+          </button>
+          <button
+            class="btn btn--ghost"
+            type="button"
+            onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href = 'browse.html?cat=all'; }"
+          >← Back</button>
         </div>
         <div class="video-detail__share">
-          <span>Share</span>
-          <a href="https://wa.me/?text={{ movie.title|escape }}%20{{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
-          <a href="https://www.facebook.com/sharer/sharer.php?u={{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer">Facebook</a>
-          <a href="https://twitter.com/intent/tweet?text={{ movie.title|escape }}&amp;url={{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer">X</a>
+          <span class="video-detail__share-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share
+          </span>
+          <a class="share-btn share-btn--whatsapp" href="https://wa.me/?text={{ movie.title|escape }}%20{{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp" title="Share on WhatsApp">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2a9.9 9.9 0 0 0-8.51 14.94L2.06 22l5.2-1.44A9.9 9.9 0 1 0 12.04 2Zm0 1.67a8.23 8.23 0 1 1-4.19 15.3l-.3-.18-3.05.84.82-2.98-.2-.31a8.23 8.23 0 0 1 6.92-12.67ZM8.6 7.13c-.2 0-.51.07-.78.36-.27.29-1.02 1-1.02 2.43 0 1.44 1.04 2.82 1.19 3.02.15.19 2.06 3.28 5.11 4.47 2.53.99 3.04.79 3.59.74.55-.05 1.76-.72 2-1.41.25-.7.25-1.29.18-1.42-.07-.12-.27-.2-.56-.34-.29-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.29-.77.97-.95 1.17-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.39-1.47-.88-.79-1.48-1.76-1.65-2.06-.17-.29-.02-.45.13-.6.13-.13.29-.34.44-.51.15-.17.2-.29.3-.49.1-.19.05-.36-.02-.51-.08-.15-.68-1.62-.93-2.22-.24-.58-.49-.5-.67-.51l-.56-.01Z"/></svg>
+          </a>
+          <a class="share-btn share-btn--facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook" title="Share on Facebook">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.19 8.44 9.94v-7.03H7.9v-2.9h2.54V9.85c0-2.52 1.5-3.91 3.78-3.91 1.09 0 2.24.2 2.24.2v2.47H15.2c-1.24 0-1.63.78-1.63 1.57v1.88h2.78l-.45 2.9h-2.33V22c4.78-.75 8.44-4.92 8.44-9.94Z"/></svg>
+          </a>
+          <a class="share-btn share-btn--x" href="https://twitter.com/intent/tweet?text={{ movie.title|escape }}&amp;url={{ canonical_url|escape }}" target="_blank" rel="noopener noreferrer" aria-label="Share on X" title="Share on X">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.67l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z"/></svg>
+          </a>
+          <button class="share-btn share-btn--copy" type="button" id="copyLinkBtn" aria-label="Copy page link" title="Copy page link">
+            <svg class="share-btn__icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <svg class="share-btn__icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -209,9 +222,6 @@
           <div class="video-panel__header">
             <span class="video-panel__kicker">Get the files</span>
             <h2>Download Links</h2>
-            {% if movie.download_help_url %}
-            <a href="{{ movie.download_help_url }}" target="_blank" rel="noopener noreferrer" class="btn btn--ghost">How to download</a>
-            {% endif %}
           </div>
           <div class="video-detail__downloads">
             {% for item in movie.download_links %}
@@ -361,7 +371,7 @@
     <span>Saved</span>
   </a>
 </nav>
-<script src="{% static 'js/common.js' %}?v=4"></script>
+<script src="{% static 'js/common.js' %}?v=5"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const track = (eventType, element) => fetch('{% url "track_activity" %}', {
@@ -371,6 +381,34 @@ document.addEventListener('DOMContentLoaded', function () {
     keepalive: true
   }).catch(() => {});
   document.querySelectorAll('.js-download-link').forEach(link => link.addEventListener('click', () => track('download', link)));
+
+  const copyBtn = document.getElementById('copyLinkBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const pageUrl = window.location.href;
+      try {
+        await navigator.clipboard.writeText(pageUrl);
+      } catch (error) {
+        const input = document.createElement('textarea');
+        input.value = pageUrl;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        input.remove();
+      }
+      copyBtn.classList.add('is-copied');
+      copyBtn.setAttribute('aria-label', 'Link copied');
+      copyBtn.title = 'Link copied!';
+      setTimeout(() => {
+        copyBtn.classList.remove('is-copied');
+        copyBtn.setAttribute('aria-label', 'Copy page link');
+        copyBtn.title = 'Copy page link';
+      }, 1600);
+    });
+  }
   const trailer = document.getElementById('trailerFrame');
   if (trailer) {
     let recorded = false;

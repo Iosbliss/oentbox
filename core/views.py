@@ -31,7 +31,7 @@ from django.conf import settings
 from django.utils.text import get_valid_filename
 from collections import Counter
 from django.utils import timezone
-from .models import ActivityEvent, Movie, NewsletterEmail, SavedMovie, ScrapeRun
+from .models import ActivityEvent, Movie, NewsletterEmail, SavedMovie, ScrapeRun, Visit
 from .seo import build_movie_schema
 from .movie_data import (
     CATEGORY_LABELS,
@@ -56,6 +56,108 @@ SCRAPE_STATE = {
 }
 SCRAPE_LOCK = threading.Lock()
 logger = logging.getLogger(__name__)
+
+# Mirror of the page whitelist in core/middleware.py, kept as a raw
+# pattern so _visitor_stats can filter historical probe rows (e.g.
+# /wp-login.php recorded before path filtering existed) directly in SQL.
+_VISIT_PATH_PATTERN = (
+	r'^/(?:'
+	r'|index\.html|about\.html|privacy\.html|terms\.html'
+	r'|youtube\.html|youtube/video\.html|browse\.html'
+	r'|saved\.html|video_detail\.html|title\.html|random/)'
+	r'$'
+)
+
+
+def _visitor_stats():
+	"""Compute self-hosted visitor analytics for the dashboard."""
+	try:
+		from django.db.models import Count
+
+		# Only genuine oentbox page views count; historical scanner-probe
+		# rows must not show up as "visitors".
+		visit_query = Visit.objects.filter(path__regex=_VISIT_PATH_PATTERN)
+		total_visits = visit_query.count()
+		unique_visitors = visit_query.values_list('ip_address', flat=True).distinct().count() if total_visits else 0
+		today = timezone.localdate()
+		visits_today = visit_query.filter(created_at__date=today).count()
+		last_7_days = visit_query.filter(
+			created_at__date__gte=today - timezone.timedelta(days=6),
+		).values('created_at__date').annotate(count=Count('id')).order_by('created_at__date')
+		visits_last_7_days = [
+			{'date': item['created_at__date'].isoformat(), 'count': item['count']}
+			for item in last_7_days
+		]
+		top_paths = list(
+			visit_query
+			.values('path')
+			.annotate(view_count=Count('id'))
+			.order_by('-view_count')[:10]
+		)
+
+		# Bot vs human split. Rows flagged by the tracking middleware or
+		# backfilled by migration 0003 are counted directly; unflagged
+		# unknown rows (shouldn't exist) fall back to signature matching.
+		from .middleware import _is_bot
+
+		bot_visits = visit_query.filter(is_bot=True).count()
+		legacy_query = visit_query.filter(is_bot=False)
+		legacy_total = legacy_query.count()
+		if legacy_total:
+			legacy_bot = 0
+			for user_agent in legacy_query.values_list('user_agent', flat=True).iterator():
+				if _is_bot(user_agent):
+					legacy_bot += 1
+			bot_visits += legacy_bot
+			human_visits = legacy_total - legacy_bot
+
+		# Top external referrers. The middleware stores the raw Referer
+		# header, so group by host; direct traffic (no Referer header) is
+		# counted separately as its own row.
+		from urllib.parse import urlparse as _urlparse
+
+		referrer_hosts = Counter()
+		direct_visits = 0
+		for referer in visit_query.values_list('referer', flat=True).iterator():
+			if not referer:
+				direct_visits += 1
+				continue
+			host = (_urlparse(referer).netloc or '').split(':')[0].lower()
+			referrer_hosts[host or '(other)'] += 1
+		if referrer_hosts.get('oentbox.com') or referrer_hosts.get('www.oentbox.com'):
+			# Internal navigation noise (our own domain) is not a source.
+			referrer_hosts.pop('oentbox.com', None)
+			referrer_hosts.pop('www.oentbox.com', None)
+			referrer_hosts.pop('104.234.124.234', None)
+		top_referrers = [
+			{'source': host, 'view_count': count}
+			for host, count in referrer_hosts.most_common(8)
+		]
+		if direct_visits:
+			top_referrers.insert(0, {'source': '(direct / none)', 'view_count': direct_visits})
+
+		return {
+			'total_visits': total_visits,
+			'unique_visitors': unique_visitors,
+			'visits_today': visits_today,
+			'visits_last_7_days': visits_last_7_days,
+			'top_paths': top_paths,
+			'human_visits': human_visits,
+			'bot_visits': bot_visits,
+			'top_referrers': top_referrers,
+		}
+	except Exception as error:
+		logger.warning('Visitor stats computation failed: %s', error)
+		return {
+			'total_visits': 0,
+			'unique_visitors': 0,
+			'visits_today': 0,
+			'visits_last_7_days': [],
+			'top_paths': [],
+			'human_visits': 0,
+			'bot_visits': 0,
+			'top_referrers': [],
+		}
 
 
 def rate_limit(scope, limit, window):
@@ -842,6 +944,7 @@ def admin_dashboard(request):
         'admin_group_count': Group.objects.count(),
         'admin_active_count': user_model.objects.filter(is_active=True).count(),
         'admin_recent_users': user_model.objects.order_by('-date_joined')[:5],
+        'visitor_stats': _visitor_stats(),
     }
     return render(request, "dashboard.html", context)
 
@@ -877,6 +980,7 @@ def dashboard_data(request):
             for event in ActivityEvent.objects.order_by('-created_at')[:500]
         ],
         'scraper': state,
+        'visitor_stats': _visitor_stats(),
         'history': {
             'total_runs': ScrapeRun.objects.count(),
             'completed_runs': ScrapeRun.objects.filter(status='completed').count(),

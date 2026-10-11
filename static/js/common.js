@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     results.forEach((item) => {
       const link = document.createElement('a');
       link.className = 'search-result';
-      link.href = `/video_detail.html?id=${encodeURIComponent(item.id)}`;
+      link.href = '/m/' + encodeURIComponent(item.id);
       if (item.thumbnail) {
         const img = document.createElement('img');
         img.src = item.thumbnail;
@@ -178,7 +178,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const movieId = button.dataset.movieId;
     const updateButton = () => {
       const isSaved = getSavedIds().includes(movieId);
-      button.textContent = isSaved ? '✓ In my list' : '+ My list';
+      const label = button.querySelector('.js-my-list-label') || button;
+      label.textContent = isSaved ? '✓ In my list' : '+ My list';
+      button.classList.toggle('is-saved', isSaved);
       button.setAttribute('aria-pressed', String(isSaved));
     };
 

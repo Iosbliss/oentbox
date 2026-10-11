@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20">
+{% include "_analytics.html" %}
 </head>
 <body data-page="dashboard">
 
@@ -191,6 +192,75 @@
 
     <!-- Stat cards -->
     <div class="dash__stats" id="statCards" data-scrape-url="{% url 'run_scraper' %}" data-scrape-status-url="{% url 'scraper_status' %}" data-scrape-stop-url="{% url 'stop_scraper' %}" data-dashboard-data-url="{% url 'dashboard_data' %}"></div>
+
+    <!-- Visitors analytics panel -->
+    {% if visitor_stats %}
+    <section class="panel visitors-panel">
+      <div class="panel__head">
+        <h2>Visitor analytics</h2>
+        <span class="row__more" id="visitorUpdated">Self-hosted</span>
+      </div>
+      <div class="visitors__summary" id="visitorSummary">
+        <div class="visitors__stat"><strong>{{ visitor_stats.total_visits }}</strong><span>Total visits</span></div>
+        <div class="visitors__stat"><strong>{{ visitor_stats.unique_visitors }}</strong><span>Unique visitors</span></div>
+        <div class="visitors__stat"><strong>{{ visitor_stats.visits_today }}</strong><span>Today</span></div>
+      </div>
+      {% if visitor_stats.visits_last_7_days %}
+      <div class="barlist visitors__barlist visitors__trend" id="visitorTrend">
+        <div class="barlist__head"><strong>Visits per day (last 7 days)</strong></div>
+        {% for item in visitor_stats.visits_last_7_days %}
+        <div class="barlist__row">
+          <span class="barlist__label">{{ item.date }}</span>
+          <div class="barlist__track"><div class="barlist__fill" style="width:{{ item.count }}px;"></div></div>
+          <span class="barlist__value">{{ item.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="barlist visitors__barlist" id="visitorQuality">
+        <div class="barlist__head"><strong>Traffic quality (bots vs humans)</strong></div>
+        <div class="barlist__row">
+          <span class="barlist__label">Humans</span>
+          <div class="barlist__track"><div class="barlist__fill" style="width:{{ visitor_stats.human_visits }}px;"></div></div>
+          <span class="barlist__value">{{ visitor_stats.human_visits }}</span>
+        </div>
+        <div class="barlist__row">
+          <span class="barlist__label">Bots / automation</span>
+          <div class="barlist__track"><div class="barlist__fill" style="width:{{ visitor_stats.bot_visits }}px;"></div></div>
+          <span class="barlist__value">{{ visitor_stats.bot_visits }}</span>
+        </div>
+      </div>
+      {% if visitor_stats.top_referrers %}
+      <div class="barlist visitors__barlist" id="visitorReferrers">
+        <div class="barlist__head"><strong>Where visitors come from</strong></div>
+        {% for item in visitor_stats.top_referrers %}
+        <div class="barlist__row">
+          <span class="barlist__label">{{ item.source|escape }}</span>
+          <div class="barlist__track"><div class="barlist__fill" style="width:{{ item.view_count }}px;"></div></div>
+          <span class="barlist__value">{{ item.view_count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if visitor_stats.top_paths %}
+      <div class="barlist visitors__barlist" id="visitorTopPages">
+      <div class="barlist visitors__barlist">
+        <div class="barlist__head"><strong>Top pages</strong></div>
+        {% for item in visitor_stats.top_paths %}
+        <div class="barlist__row">
+          <span class="barlist__label">{{ item.path|escape }}</span>
+          <div class="barlist__track"><div class="barlist__fill" style="width:{{ item.view_count }}px;"></div></div>
+          <span class="barlist__value">{{ item.view_count }}</span>
+        </div>
+        {% empty %}
+        <p class="panel__sub">No visits recorded yet.</p>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="panel__sub">No visits recorded yet.</p>
+      {% endif %}
+    </section>
+    {% endif %}
 
     <!-- Charts row -->
     <div class="dash__grid">

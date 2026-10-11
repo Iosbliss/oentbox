@@ -1,7 +1,7 @@
 {
-  "name": "oentbox — Entertainment, Reimagined",
+  "name": "oentbox Movies & TV",
   "short_name": "oentbox",
-  "description": "A modernized, native-feeling redesign of a Nigerian entertainment discovery hub.",
+  "description": "Stream and discover Nollywood, Hollywood, Bollywood, K-drama, anime, and world series on oentbox.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",

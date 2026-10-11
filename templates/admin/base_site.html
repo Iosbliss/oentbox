@@ -1,7 +1,39 @@
 {% extends "admin/base.html" %}
-{% load static %}
+{% load static i18n %}
+
+{% block title %}{% blocktrans with site_name=site_header|default:"oentbox Admin" %}{{ site_name }} — Admin{% endblocktrans %}{% endblock %}
+
+{% block bodyclass %}{{ block.super }} admin-theme{% endblock %}
+
+{% block dark-mode-vars %}
+  {# Force dark theme before any CSS loads; theme.js will respect this as the default #}
+  <script>
+    if (!localStorage.getItem('theme')) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  </script>
+  {{ block.super }}
+{% endblock %}
 
 {% block extrahead %}
   {{ block.super }}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/icon-o.svg' %}?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/admin.css' %}?v=20261011-2">
 {% endblock %}
+
+{% block branding %}
+  <div class="oentbox-admin-brand">
+    <a href="{% url 'admin:index' %}">
+      <span class="brand__mark">O</span>
+      <span class="brand__name">oent<em>box</em></span>
+    </a>
+    {% if user.is_staff %}
+    <a href="{% url 'admin_dashboard' %}" class="dashboard-link">Catalog dashboard</a>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
