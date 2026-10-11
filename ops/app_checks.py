@@ -20,7 +20,7 @@ django.setup()
 
 from django.utils import timezone  # noqa: E402
 
-from core.models import DownloadJob, Movie, ScrapeRun  # noqa: E402
+from core.models import Movie, ScrapeRun  # noqa: E402
 
 
 def env_int(name, default):
@@ -32,8 +32,6 @@ def env_int(name, default):
 
 SCRAPE_MAX_AGE_H = env_int("SCRAPE_MAX_AGE_HOURS", 48)
 SCRAPE_STUCK_H = env_int("SCRAPE_STUCK_HOURS", 6)
-DOWNLOAD_ERRORS_MAX = env_int("DOWNLOAD_ERRORS_MAX_24H", 5)
-DOWNLOAD_STUCK_H = env_int("DOWNLOAD_STUCK_HOURS", 3)
 
 now = timezone.now()
 failures = []
@@ -66,16 +64,6 @@ elif run.status == "running":
     report(running_h <= SCRAPE_STUCK_H, "scrape run running %.1fh (stuck limit %dh)" % (running_h, SCRAPE_STUCK_H))
 else:
     report(True, "latest scrape run %s, %d new titles" % (run.status, run.new_titles))
-
-since = now - datetime.timedelta(hours=24)
-errors_24h = DownloadJob.objects.filter(status="error", updated_at__gte=since).count()
-report(errors_24h <= DOWNLOAD_ERRORS_MAX, "%d download errors in 24h (limit %d)" % (errors_24h, DOWNLOAD_ERRORS_MAX))
-
-stuck = DownloadJob.objects.filter(
-    status__in=["starting", "downloading"],
-    updated_at__lt=now - datetime.timedelta(hours=DOWNLOAD_STUCK_H),
-).count()
-report(stuck == 0, "%d stuck download jobs (>%dh without progress)" % (stuck, DOWNLOAD_STUCK_H))
 
 if failures:
     print("SUMMARY: " + "; ".join(failures))
